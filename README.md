@@ -1,2 +1,3 @@
-# MacBook-Neo-Arch-Attempt
-My own attempt to get Arch Linux to boot on a MacBook Neo 512GB.
+# VLinux | Linux on MacBook Neo
+
+A WIP beta to get Arch Linux running on a MacBook Neo
