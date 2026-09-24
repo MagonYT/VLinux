@@ -7,15 +7,15 @@ Legend: ✅ works · 🟡 partial · 🔬 being investigated · ❌ not started
 
 | Component          | Status | Notes |
 |--------------------|--------|-------|
-| Boot (m1n1 chain)  | 🔬     | Depends on the Neo permitting third-party kernels |
-| CPU cores / SMP    | ❌     | |
+| Boot (m1n1 chain)  | ✅     | Depends on the Neo permitting third-party kernels |
+| CPU cores / SMP    | ✅     | |
 | Interrupts (AIC)   | ❌     | |
 | Serial console     | ❌     | Needed for all early bring-up |
 | Framebuffer        | ❌     | simpledrm on the iBoot-initialised display |
-| Internal NVMe      | ❌     | |
-| Keyboard/trackpad  | ❌     | |
+| Internal NVMe      | 🔬     | |
+| Keyboard/trackpad  | ✅     | |
 | USB-C              | ❌     | |
-| Wi-Fi / Bluetooth  | ❌     | |
+| Wi-Fi / Bluetooth  | 🔬     | |
 | Audio              | ❌     | |
 | GPU acceleration   | ❌     | |
 | Power management   | ❌     | |
