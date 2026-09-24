@@ -35,6 +35,14 @@ it is restored from a second Mac via DFU. Back up your data first.
 
 VLinux is not affiliated with Apple, Asahi Linux or Arch Linux ARM.
 
+## AI disclosure
+
+AI tools were used during VLinux's development, mainly as a reference and
+guide. They helped with debugging, explained unfamiliar kernel and hardware
+behaviour, and drafted some code. Every piece of AI-assisted code was
+reviewed by hand, and much of it was rewritten to fit the project's design
+and the kernel's conventions.
+
 ## License
 
 [Apache License 2.0](LICENSE). Kernel patches and device trees will be
