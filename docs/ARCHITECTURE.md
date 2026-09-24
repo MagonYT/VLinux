@@ -11,7 +11,7 @@ iBoot (Apple, in ROM/NOR)
        └─ m1n1 stage 2    turns the Apple device tree (ADT) into a Linux DT
             └─ U-Boot     provides a UEFI environment
                  └─ GRUB / systemd-boot (EFI)
-                      └─ Linux (VLinux kernel, out/boot/Image + DTB)
+                      └─ Linux (VLinux kernel + MacBook Neo DTB)
                            └─ Arch Linux ARM userspace
 ```
 
