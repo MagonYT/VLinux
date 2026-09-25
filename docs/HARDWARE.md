@@ -32,6 +32,19 @@ The [Touch ID investigation](TOUCH-ID.md) includes a read-only metadata scanner
 and an explicit list of unresolved protocol and storage requirements.
 The [network investigation](NETWORK.md) resolves the conflicting Broadcom device
 tree text against enumerated PCI IDs and installed Sunrise driver metadata.
+The [diagnostics desktop](DIAGNOSTICS.md) adds a batch report for power, thermal,
+backlight, USB and graphics interfaces without adding hardware drivers.
+
+## Battery and SMC scope
+
+The current native configuration enables `CONFIG_MFD_MACSMC` but leaves
+`CONFIG_MACSMC_POWER` disabled. The t8140 device-tree overlay deliberately selects
+the Neo trackpad power path. In the patched `drivers/mfd/macsmc.c`, that path
+returns `-EOPNOTSUPP` for generic SMC key reads/writes and key-info requests;
+it exposes the bounded trackpad operation instead. Enabling the battery config
+option alone would therefore not provide a working battery driver. A port must
+first establish the Neo's generic key protocol and notification behavior while
+preserving the working trackpad path.
 
 ## Sharing observations
 
