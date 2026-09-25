@@ -45,6 +45,9 @@ python3 -m unittest test_driver_inventory test_sep_inventory test_network_invent
 Choose a fresh output directory each time. The buffer test emits `result.json`
 with source/fixture hashes, counts and its actual exit status. Its fixture contains
 only the three relevant node paths and five non-identifying ADT properties.
+The runner creates its generated configuration under the test output directory;
+the prepared upstream tree need not have been built. It preserves any existing
+developer build configuration.
 
 The `Host checks` workflow runs the portable metadata tests, pinned m1n1 source
 verification and all three C sanitizer configurations on an Ubuntu runner. It has

@@ -8,12 +8,13 @@
 #include "fixture.h"
 #undef printf
 extern int printf(const char *, ...);
+extern int fflush(void *);
 extern void abort(void);
 #define ASC 0x389600000ULL
 #define SART 0x38dc50000ULL
 #define A 0x100241c4000ULL
 #define TYPE(n) ((u64)(n)<<52)
-#define CHECK(x) do { if(!(x)) {printf("FAIL %d %s case=%d io=%u rx=%u grants=%u\n%s",__LINE__,#x,scenario,calls,service_rx,grants,report);abort();}}while(0)
+#define CHECK(x) do { if(!(x)) {printf("FAIL %d %s case=%d io=%u rx=%u grants=%u\n%s",__LINE__,#x,scenario,calls,service_rx,grants,report);fflush(NULL);abort();}}while(0)
 static char report[16384], visible[1200];
 static unsigned visible_used, calls, writes, write32s, grants, starts, discovery_rx, service_rx;
 static unsigned checkpoint, polls, delays, prepares, acks, last_kind;
@@ -81,6 +82,9 @@ static bool rd32(u64 address,u32 *out)
                 if(scenario==14)ready=false;
                 if(scenario==16 || scenario==18)ready=true;
                 if(scenario==17)ready=!service_rx || polls%6000==0;
+                if(scenario==28)ready=service_rx<27;
+                if(scenario==29 || scenario==31)ready=service_rx<43;
+                if(scenario==30)ready=true;
                 *out=ready?0x2201:0x22201;
             }
             break;
@@ -119,6 +123,15 @@ static void incoming(u64 *message,unsigned *ep)
     if(n==1 && scenario==22)*ep=257;
     if(n==6 && scenario==23)*message=TYPE(8)|1; /* unknown metadata: no ACK */
     if(n==10 && scenario==24)*message=0x1070000000000020ULL;
+    /* IMG_0843: two buffers, followed by canonical endpoint-4 reports.
+     * Only case 28 replays the observed 27-message prefix. Cases 29-31 are
+     * independent hypothetical continuations, not claims about the device. */
+    if(scenario>=28 && scenario<=31) {
+        *ep=n?4:1;
+        *message=!n?0x0010800000000000ULL:n==1?TYPE(1)|(4ULL<<44):TYPE(8);
+        if(n==42 && (scenario==29 || scenario==31)) {*ep=0;*message=TYPE(7)|0x20;}
+        if(n==2 && scenario==31)*message|=1; /* must not broaden canonical ACKs */
+    }
 }
 static bool rd64(u64 address,u64 *out)
 {
@@ -154,7 +167,9 @@ static bool wr64(u64 address,u64 value)
         CHECK(starts<6 && held==(TYPE(5)|((u64)eps[starts]<<32)|2));starts++;
     } else if((held>>52)==1 || (held>>56)==1) {
         CHECK(prepared && write32s==3 && table[2][0]==0xff && grants<4);
-        static const unsigned eps[]={1,2,4,8};CHECK(value==eps[grants]);
+        static const unsigned eps[]={1,2,4,8};
+        bool native_stream=scenario>=28 && scenario<=31;
+        CHECK(native_stream ? grants<2 && value==(grants?4:1) : value==eps[grants]);
         u64 addr=value==8?(held&0xfffffffffULL)<<12:held&0xfffffffffffULL;
         u64 size=value==8?(held>>36)&0xfffff:((held>>44)&0xff)<<12;
         u64 expected=grants==0?0x8000:scenario==19?0x40000:grants==1?0x4000:grants==2?0x8000:0x5000;
@@ -163,7 +178,7 @@ static bool wr64(u64 address,u64 value)
         for(unsigned i=0;i<grants;i++)CHECK(addr>=addresses[i]+lengths[i]);
         addresses[grants]=addr;lengths[grants]=size;grants++;allocated+=ALIGN_UP(size,0x4000);
     } else {
-        CHECK(grants==4);
+        CHECK(grants==4 || (scenario>=28 && scenario<=31 && grants==2));
         CHECK((value==2 && held==(TYPE(5)|3)) || (value==4 && (held==TYPE(8) || held==TYPE(12))));acks++;
     }
     return ok;
@@ -214,6 +229,10 @@ static unsigned run(void)
 }
 int main(void)
 {
+    reset(28);unsigned replay=run();
+    printf("NATIVE_PREFIX_REPLAY checkpoint=%u rx=%u grants=%u acks=%u tx-words=%u\n",
+           replay,service_rx,grants,acks,writes-8);
+    CHECK(replay==75 && service_rx==27 && grants==2 && acks==25 && write32s==3);
     reset(0);CHECK(run()==76 && grants==4 && write32s==3 && acks==3 && prepares==1);
     unsigned positions=calls,write_fault_cases=0;
     printf("BUFFER_SIMULATED_BOOT io=%u\n%s",positions,visible);
@@ -222,9 +241,10 @@ int main(void)
         CHECK(run()==78 && faulted && calls==i+1);
         if(last_kind)write_fault_cases++;
     }
-    for(int s=1;s<=27;s++) {
+    for(int s=1;s<=31;s++) {
         reset(s);unsigned n=run();
-        unsigned expected=s==12 || s==15 || s==16 || s==17?75:s==19 || s==23 || s==27?76:78;
+        unsigned expected=s==12 || s==15 || s==16 || s==17 || s==18 || s==28 || s==30?75:
+                          s==19 || s==23 || s==27 || s==29 || s==31?76:78;
         CHECK(n==expected);
         if(s==3 || s==4)CHECK(!write32s && !grants);
         if(s==5)CHECK(write32s==1 && !grants);
@@ -232,13 +252,25 @@ int main(void)
         if(s==12)CHECK(grants==1 && polls==10001);
         if(s==13)CHECK(grants==0 && delays==2000);
         if(s==14)CHECK(!prepares && !write32s && polls==10000);
-        if(s==16)CHECK(service_rx==32 && grants==1);
+        if(s==16)CHECK(service_rx==256 && grants==1);
         if(s==17)CHECK(polls==50000 && grants==1);
-        if(s==18)CHECK(writes==72 && strstr(visible,"transmit packet/limit"));
+        if(s==18)CHECK(service_rx==256 && writes<=532 && strstr(report,"end=message-limit"));
         if(s==19)CHECK(allocated==0xc8000 && grants==4);
         if(s==20 || s==21)CHECK(!calls);
         if(s==23)CHECK(acks==2);
         if(s==25 || s==26)CHECK(!starts && !write32s);
+        if(s==28)CHECK(service_rx==27 && grants==2 && acks==25 && polls==10027);
+        if(s==29)CHECK(service_rx==43 && grants==2 && acks==40 && write32s==3);
+        if(s==30)CHECK(service_rx==256 && grants==2 && acks==254 && writes==532 &&
+                       strstr(report,"end=message-limit"));
+        if(s==31)CHECK(service_rx==43 && acks==39);
+    }
+    reset(30);CHECK(run()==75);
+    unsigned stream_positions=calls,stream_write_faults=0;
+    for(unsigned i=0;i<stream_positions;i++)for(int applied=0;applied<2;applied++) {
+        reset(30);fault_at=i;after_write=applied;
+        CHECK(run()==78 && faulted && calls==i+1);
+        if(last_kind)stream_write_faults++;
     }
     unsigned poll_faults=0;
     for(int s=12;s<=17;s++) {
@@ -267,6 +299,7 @@ int main(void)
     CHECK(!neo_ssd_buffers_write64_allowed(A,ASC+0x8800,TYPE(1)|(8ULL<<44)|(A-0x4000)));
     CHECK(!neo_ssd_buffers_write64_allowed(A,ASC+0x8800,TYPE(1)|(8ULL<<44)|(A+NEO_SSD_BUFFER_POOL_SIZE)));
     CHECK(!neo_ssd_buffers_write64_allowed(A,ASC+0x8800,TYPE(1)|(8ULL<<44)|(A+1)));
-    printf("ALL_BUFFER_HOST_CHECKS_PASSED mmio-positions=%u write-fault-cases=%u protocol-cases=27 poll-fault-cases=%u\n",positions,write_fault_cases,poll_faults);
+    printf("NATIVE_STREAM_FAULT_CHECKS_PASSED positions=%u write-fault-cases=%u replay-cases=4\n",stream_positions,stream_write_faults);
+    printf("ALL_BUFFER_HOST_CHECKS_PASSED mmio-positions=%u write-fault-cases=%u protocol-cases=31 poll-fault-cases=%u\n",positions,write_fault_cases,poll_faults);
     return 0;
 }

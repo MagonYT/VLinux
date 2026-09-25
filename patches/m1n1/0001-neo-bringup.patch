@@ -1697,10 +1697,10 @@ index 0000000..1c34012
 +#endif
 diff --git a/src/neo_ssd_buffers.c b/src/neo_ssd_buffers.c
 new file mode 100644
-index 0000000..bb663cf
+index 0000000..d7d81d3
 --- /dev/null
 +++ b/src/neo_ssd_buffers.c
-@@ -0,0 +1,310 @@
+@@ -0,0 +1,326 @@
 +/* SPDX-License-Identifier: MIT */
 +/* Protocol: Asahi RTKit/SARTv3. First buffer request photographed in IMG_0839. */
 +#include <stdarg.h>
@@ -1717,6 +1717,9 @@ index 0000000..bb663cf
 +#define TYPE(n) ((u64)(n) << 52)
 +
 +static const u8 endpoints[] = {1, 2, 3, 4, 8, 10};
++_Static_assert(NEO_SSD_BUFFER_TX_WORD_LIMIT ==
++               2 * (ARRAY_SIZE(endpoints) + NEO_SSD_BUFFER_RX_LIMIT),
++               "Service TX budget must cover STARTs and one reply per captured RX");
 +struct service { unsigned int rx; u64 first, requested, granted; };
 +struct probe {
 +    const struct neo_ssd_buffer_ops *ops;
@@ -1724,6 +1727,7 @@ index 0000000..bb663cf
 +    size_t size, used;
 +    u64 arena, allocated;
 +    unsigned int tx, rx, starts, grants, writes;
++    unsigned int ioreports, iostarts, ioacks;
 +    bool mapped;
 +};
 +
@@ -1796,7 +1800,7 @@ index 0000000..bb663cf
 +        (ep == 8 && (message >> 56) == 1 && grant_valid(p->arena, message) && p->mapped) ||
 +        (ep == 2 && (message & ~0xffULL) == TYPE(5) && p->mapped) ||
 +        (ep == 4 && (message == TYPE(8) || message == TYPE(12)) && p->mapped);
-+    if (!packet || p->tx > 62 ||
++    if (!packet || p->tx > NEO_SSD_BUFFER_TX_WORD_LIMIT - 2 ||
 +        !neo_ssd_buffers_write64_allowed(p->arena, ASC + 0x8800, message) ||
 +        !neo_ssd_buffers_write64_allowed(p->arena, ASC + 0x8808, ep)) {
 +        note(p, "SSD_BUF_REFUSED transmit packet/limit ep=%u\n", ep);
@@ -1905,6 +1909,8 @@ index 0000000..bb663cf
 +    bool iop_seen = false;
 +    struct service svc[ARRAY_SIZE(endpoints)] = {0};
 +    note(&p, "SSD_BUF_BEGIN private service buffers; no AP power or NVMe commands\n");
++    note(&p, "SSD_BUF_LIMITS rx=%u tx_words=%u raw_log=%u\n",
++         NEO_SSD_BUFFER_RX_LIMIT, NEO_SSD_BUFFER_TX_WORD_LIMIT, NEO_SSD_BUFFER_RAW_LOG_LIMIT);
 +    int sart = adt_path_offset(adt, "/arm-io/sart-ans");
 +    int nub = adt_path_offset(adt, "/arm-io/ans/iop-ans-nub");
 +    u32 version = 0;
@@ -1932,7 +1938,7 @@ index 0000000..bb663cf
 +        p.starts++;
 +    }
 +    /* One request per buffer endpoint, 256 KiB each, 1 MiB total. No reuse. */
-+    for (; polls < 50000 && p.rx < 32; polls++) {
++    for (; polls < 50000 && p.rx < NEO_SSD_BUFFER_RX_LIMIT; polls++) {
 +        u32 control;
 +        if (!rd32(&p, ASC + 0x8114, &control)) goto hold;
 +        if (control & (1U << 17)) {
@@ -1949,7 +1955,12 @@ index 0000000..bb663cf
 +            note(&p, "SSD_BUF_FAULT receive word1; stop SSD MMIO\n"); goto hold;
 +        }
 +        p.rx++;
-+        note(&p, "SSD_BUF_RX msg=%016lx endpoint=%016lx\n", message, endpoint);
++        /* Repeated reports must not consume the space needed for the final
++         * safety counters. Capture the first packets, then aggregate. */
++        if (p.rx <= NEO_SSD_BUFFER_RAW_LOG_LIMIT)
++            note(&p, "SSD_BUF_RX msg=%016lx endpoint=%016lx\n", message, endpoint);
++        else if (p.rx == NEO_SSD_BUFFER_RAW_LOG_LIMIT + 1)
++            note(&p, "SSD_BUF_RX raw log capped; remaining messages counted in summary\n");
 +        unsigned int ep = (u32)endpoint;
 +        if (p.rx == 1 && (ep != 1 || message != 0x0010800000000000ULL)) {
 +            note(&p, "SSD_BUF_REFUSED first request differs from native 32 KiB crashlog\n");
@@ -1969,6 +1980,8 @@ index 0000000..bb663cf
 +        struct service *s = &svc[slot];
 +        if (!s->rx) s->first = message;
 +        s->rx++;
++        if (ep == 4 && message == TYPE(8)) p.ioreports++;
++        if (ep == 4 && message == TYPE(12)) p.iostarts++;
 +        bool request = ((ep == 1 || ep == 2 || ep == 4) && (message >> 52) == 1) ||
 +                       (ep == 8 && (message >> 56) == 1);
 +        if (request) {
@@ -1994,13 +2007,16 @@ index 0000000..bb663cf
 +            if (!send(&p, message, ep)) goto hold; /* ACK without reading log memory. */
 +        } else if (ep == 4 && (message == TYPE(8) || message == TYPE(12)) && s->granted) {
 +            if (!send(&p, message, ep)) goto hold;
++            p.ioacks++;
 +        } /* Retain all other metadata without dereferencing or replying. */
 +    }
 +    if (!p.grants) { note(&p, "SSD_BUF_TIMEOUT no buffer granted\n"); goto hold; }
 +    checkpoint = 75;
 +    note(&p, "SSD_BUF_CAPTURED end=%s; IOP ON unconfirmed\n",
-+         p.rx == 32 ? "message-limit" : idle == 10000 ? "quiet" : "poll-limit");
++         p.rx == NEO_SSD_BUFFER_RX_LIMIT ? "message-limit" : idle == 10000 ? "quiet" : "poll-limit");
 +hold:
++    note(&p, "SSD_BUF_IOREPORT reports=%u starts=%u ack=%u; rx_limit=%u tx_limit=%u\n",
++         p.ioreports, p.iostarts, p.ioacks, NEO_SSD_BUFFER_RX_LIMIT, NEO_SSD_BUFFER_TX_WORD_LIMIT);
 +    for (unsigned int i = 0; i < ARRAY_SIZE(endpoints); i++)
 +        note(&p, "SSD_BUF ep=%u rx=%u bytes=%lx grant=%lx first=%016lx\n",
 +             endpoints[i], svc[i].rx, svc[i].requested, svc[i].granted, svc[i].first);
@@ -2013,10 +2029,10 @@ index 0000000..bb663cf
 +}
 diff --git a/src/neo_ssd_buffers.h b/src/neo_ssd_buffers.h
 new file mode 100644
-index 0000000..3f5268e
+index 0000000..f2dbfbe
 --- /dev/null
 +++ b/src/neo_ssd_buffers.h
-@@ -0,0 +1,29 @@
+@@ -0,0 +1,34 @@
 +/* SPDX-License-Identifier: MIT */
 +#ifndef NEO_SSD_BUFFERS_H
 +#define NEO_SSD_BUFFERS_H
@@ -2025,6 +2041,9 @@ index 0000000..3f5268e
 +
 +#define NEO_SSD_BUFFER_POOL_SIZE 0x100000
 +#define NEO_SSD_BUFFER_LIMIT     0x40000
++#define NEO_SSD_BUFFER_RX_LIMIT  256
++#define NEO_SSD_BUFFER_TX_WORD_LIMIT 524
++#define NEO_SSD_BUFFER_RAW_LOG_LIMIT 16
 +
 +struct neo_ssd_buffer_ops {
 +    struct neo_ssd_firmware_ops mailbox;
@@ -2039,7 +2058,9 @@ index 0000000..3f5268e
 +/* Caller must reserve/consume the full 1 MiB pool using the compiled memory
 + * planner. Maps only previously empty SARTv3 slot 2. Never releases that slot
 + * or memory, even after a partial write/fault. Returns 75 for a bounded partial
-+ * capture, 76 for IOP ON observed, 78 for refusal/fault. ALWAYS hold; no AP power
++ * capture, 76 for IOP ON observed, 78 for refusal/fault. Capture at most 256 RX
++ * messages and 524 service TX words (six STARTs plus one reply per RX). Existing
++ * 50000 total / 10000 consecutive-empty polling bounds remain. ALWAYS hold; no AP power
 + * request, application endpoint, NVMe configuration/command or Linux handoff.
 + */
 +unsigned int neo_ssd_buffers_probe(u64 arena, char *report, size_t size,

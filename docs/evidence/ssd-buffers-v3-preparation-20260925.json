@@ -1,0 +1,98 @@
+{
+  "build_id": "7d53a0b40d1b4814",
+  "payload_sha256": "051ef52ea29aaa9aa26aca998c53b34353964ba43db74a049e5e2f37857c289c",
+  "payload_bytes": 457703424,
+  "bootloader_sha256": "15af81d522a3761f373749c3fa1dace45167c37ee75639f5338ea4c65b403056",
+  "native_predecessor_sha256": "808d8b58fbb1925a44ac86920df54572c146ea5f1f70f1c3a77aba03249e3396",
+  "bounds": {
+    "rx_messages": 256,
+    "service_tx_words": 524,
+    "raw_packets_logged": 16,
+    "pool_bytes": 1048576,
+    "sart_writes": 3,
+    "receive_polls": 50000,
+    "consecutive_empty_polls": 10000,
+    "outbound_fifo_polls_per_send": 2000
+  },
+  "portable_buffer_host": {
+    "passed": true,
+    "exit": 0,
+    "source_sha256": "562aeec24d865ac49283e5568d9444a658928e0c5326cae7a560db23cacc623b",
+    "header_sha256": "d513d1c9ed58f3521124ce001a7b95f855f533864e92045a9c76e1eec0431a82",
+    "harness_sha256": "38e8ba3dd5d45042d492c4c2ede9a00e754f13902139b4bce8f5f6c90ddef229",
+    "fixture_sha256": "af8b7d91021d2db9657a0bf501e7af02773ba1f3e6897c0d9630352861a7edba",
+    "configuration_from_header": true,
+    "build_cfg_sha256": "21232ca7be336f2ac1e022cc4c2a23fb5d69b151874dc7b775cc404d7729e857",
+    "identify_header_sha256": "d2703f7dd04b1e30c9ecf8254dc925a6c342315a33d1b05b6862d030cfc37777",
+    "mmio_positions": 202,
+    "write_fault_cases": 74,
+    "protocol_cases": 31,
+    "poll_fault_cases": 18,
+    "stream_mmio_positions": 1684,
+    "stream_write_fault_cases": 1070,
+    "native_stream_cases": 4
+  },
+  "private_host_regressions": 195,
+  "source_reconstruction": {
+    "passed": true,
+    "selected_m1n1_files": 29
+  },
+  "exact_early_startup": {
+    "passed": true,
+    "checkpoint": 2,
+    "scope": "QEMU TCG before UART/peripheral initialization."
+  },
+  "vm": {
+    "platform": "QEMU virt",
+    "cpus": 1,
+    "memory_gib": 4,
+    "disk": false,
+    "nic": false,
+    "checks": {
+      "systemd": {
+        "passed": true,
+        "clean_exit": true
+      },
+      "plasma": {
+        "passed": true,
+        "clean_exit": true
+      },
+      "desktop": {
+        "passed": true,
+        "clean_exit": true
+      }
+    }
+  },
+  "report_pages": [
+    {
+      "page": "hardware",
+      "passed": true,
+      "sha256": "a8b3cdfeb639ce8a1fd8a978b68a892f25cbb157b96abfcacdb826531602a292"
+    },
+    {
+      "page": "ssd",
+      "passed": true,
+      "sha256": "e3e7251d66495602a2191757c4e9d2ae21b5a9c88ed8434e3519960f6a299e08"
+    },
+    {
+      "page": "network",
+      "passed": true,
+      "sha256": "f23de45bfc22e8f6bf0ce9d37c5422f3b4e0953e58ccfbc941270d4f5363d65c"
+    },
+    {
+      "page": "input",
+      "passed": true,
+      "sha256": "b52a6547e27dacdf6b19096abc36225da62f7a17fea59859434228c8b9f5c00c"
+    },
+    {
+      "page": "logs",
+      "passed": true,
+      "sha256": "045ed3ddaf2842d88ce82462a28bf0bea1fb44651b92705615db552fc8943695"
+    }
+  ],
+  "native_tested": false,
+  "native_storage_tested": false,
+  "replay_scope": "Synthetic type-8 stream consistent with the photographed counts; not every packet was visible. Later IOP ON in a test is hypothetical.",
+  "scope": "Preparation checks, not physical SSD proof. VMs exercise the packaged Arch/KDE and virtual input, not Neo SART/mailbox/DT. Native v3 result pending.",
+  "boot_binary_published": false
+}
