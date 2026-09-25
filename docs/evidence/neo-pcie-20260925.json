@@ -1,0 +1,235 @@
+{
+  "source_sha256": "6bec1fcf07b257d32d9c082418701f5cc99f84bee7497b78f45989607c5056dc",
+  "scope": "Registry metadata only; register roles and access safety are not inferred from array positions.",
+  "nodes": [
+    {
+      "path": "/arm-io/apcie",
+      "compatible": [
+        "apcie,t8140"
+      ],
+      "registers": [
+        {
+          "index": 0,
+          "bus_address": "0x1cb0000000",
+          "bytes": "0x10000000",
+          "physical_address": "0x1cb0000000"
+        },
+        {
+          "index": 1,
+          "bus_address": "0x394000000",
+          "bytes": "0x4000",
+          "physical_address": "0x394000000"
+        },
+        {
+          "index": 2,
+          "bus_address": "0x397000000",
+          "bytes": "0x40000",
+          "physical_address": "0x397000000"
+        },
+        {
+          "index": 3,
+          "bus_address": "0x397040000",
+          "bytes": "0x28000",
+          "physical_address": "0x397040000"
+        },
+        {
+          "index": 4,
+          "bus_address": "0x396000000",
+          "bytes": "0x1000000",
+          "physical_address": "0x396000000"
+        },
+        {
+          "index": 5,
+          "bus_address": "0x395046200",
+          "bytes": "0x4000",
+          "physical_address": "0x395046200"
+        },
+        {
+          "index": 6,
+          "bus_address": "0x395044000",
+          "bytes": "0x4000",
+          "physical_address": "0x395044000"
+        },
+        {
+          "index": 7,
+          "bus_address": "0x390028000",
+          "bytes": "0x8000",
+          "physical_address": "0x390028000"
+        },
+        {
+          "index": 8,
+          "bus_address": "0x39003c000",
+          "bytes": "0x4000",
+          "physical_address": "0x39003c000"
+        },
+        {
+          "index": 9,
+          "bus_address": "0x397020000",
+          "bytes": "0x4000",
+          "physical_address": "0x397020000"
+        },
+        {
+          "index": 10,
+          "bus_address": "0x390024000",
+          "bytes": "0x4000",
+          "physical_address": "0x390024000"
+        },
+        {
+          "index": 11,
+          "bus_address": "0x390048000",
+          "bytes": "0x4000",
+          "physical_address": "0x390048000"
+        },
+        {
+          "index": 12,
+          "bus_address": "0x390044000",
+          "bytes": "0x4000",
+          "physical_address": "0x390044000"
+        },
+        {
+          "index": 13,
+          "bus_address": "0x391028000",
+          "bytes": "0x8000",
+          "physical_address": "0x391028000"
+        },
+        {
+          "index": 14,
+          "bus_address": "0x39103c000",
+          "bytes": "0x4000",
+          "physical_address": "0x39103c000"
+        },
+        {
+          "index": 15,
+          "bus_address": "0x397024000",
+          "bytes": "0x4000",
+          "physical_address": "0x397024000"
+        },
+        {
+          "index": 16,
+          "bus_address": "0x391024000",
+          "bytes": "0x4000",
+          "physical_address": "0x391024000"
+        },
+        {
+          "index": 17,
+          "bus_address": "0x391048000",
+          "bytes": "0x4000",
+          "physical_address": "0x391048000"
+        },
+        {
+          "index": 18,
+          "bus_address": "0x391044000",
+          "bytes": "0x4000",
+          "physical_address": "0x391044000"
+        },
+        {
+          "index": 19,
+          "bus_address": "0x392028000",
+          "bytes": "0x8000",
+          "physical_address": "0x392028000"
+        },
+        {
+          "index": 20,
+          "bus_address": "0x39203c000",
+          "bytes": "0x4000",
+          "physical_address": "0x39203c000"
+        },
+        {
+          "index": 21,
+          "bus_address": "0x397028000",
+          "bytes": "0x4000",
+          "physical_address": "0x397028000"
+        },
+        {
+          "index": 22,
+          "bus_address": "0x392024000",
+          "bytes": "0x4000",
+          "physical_address": "0x392024000"
+        },
+        {
+          "index": 23,
+          "bus_address": "0x392048000",
+          "bytes": "0x4000",
+          "physical_address": "0x392048000"
+        },
+        {
+          "index": 24,
+          "bus_address": "0x392044000",
+          "bytes": "0x4000",
+          "physical_address": "0x392044000"
+        }
+      ],
+      "interrupts": [
+        "0x4b5",
+        "0x4be",
+        "0x4c7"
+      ],
+      "clock-gates": [
+        "0x39",
+        "0x35",
+        "0x3e",
+        "0x4c",
+        "0x5e",
+        "0x62"
+      ],
+      "power-gates": [
+        "0x39",
+        "0x35",
+        "0x3e",
+        "0x4c",
+        "0x5e",
+        "0x62"
+      ],
+      "#ports": [
+        "0x3"
+      ],
+      "#address-cells": [
+        "0x3"
+      ],
+      "#size-cells": [
+        "0x2"
+      ]
+    },
+    {
+      "path": "/arm-io/apcie/pci-bridge0",
+      "compatible": [
+        "apcie-bridge"
+      ],
+      "#address-cells": [
+        "0x3"
+      ],
+      "#size-cells": [
+        "0x2"
+      ],
+      "device-id": [
+        "0x100c"
+      ],
+      "vendor-id": [
+        "0x106b"
+      ]
+    },
+    {
+      "path": "/arm-io/dart-apcie0",
+      "compatible": [
+        "dart,t8110"
+      ],
+      "registers": [
+        {
+          "index": 0,
+          "bus_address": "0x390000000",
+          "bytes": "0x20000",
+          "physical_address": "0x390000000"
+        },
+        {
+          "index": 1,
+          "bus_address": "0xf079c000",
+          "bytes": "0x4000",
+          "physical_address": "0x30079c000"
+        }
+      ],
+      "interrupts": [
+        "0x4b6"
+      ]
+    }
+  ]
+}

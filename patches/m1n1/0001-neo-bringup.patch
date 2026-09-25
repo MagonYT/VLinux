@@ -1,5 +1,5 @@
 diff --git a/Makefile b/Makefile
-index 1ee603e580e5e26b3b4be2477e2c953986bfd6af..0e1ece647333261ced5c9e5e3272a261395e6321 100644
+index 1ee603e..0e1ece6 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -68,6 +68,66 @@ BASE_CFLAGS := -O2 -Wall -g -Wundef -Werror=strict-prototypes -fno-common -fno-P
@@ -94,7 +94,7 @@ index 1ee603e580e5e26b3b4be2477e2c953986bfd6af..0e1ece647333261ced5c9e5e3272a261
  	math/expf.o \
 diff --git a/src/boot_trace.h b/src/boot_trace.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..07f4b7f833179e09681ea396ae83e3681b06f021
+index 0000000..07f4b7f
 --- /dev/null
 +++ b/src/boot_trace.h
 @@ -0,0 +1,39 @@
@@ -138,7 +138,7 @@ index 0000000000000000000000000000000000000000..07f4b7f833179e09681ea396ae83e368
 +}
 +#endif
 diff --git a/src/dapf.c b/src/dapf.c
-index 3b4b773dc62da2b1ed1c31a8104da7ffa5d8bba6..33524dac1150cd9481ec5e03141470eab76c5ed8 100644
+index 3b4b773..33524da 100644
 --- a/src/dapf.c
 +++ b/src/dapf.c
 @@ -69,6 +69,121 @@ struct dapf_t8110b_config {
@@ -264,7 +264,7 @@ index 3b4b773dc62da2b1ed1c31a8104da7ffa5d8bba6..33524dac1150cd9481ec5e03141470ea
  {
      int count = length / sizeof(*config);
 diff --git a/src/dapf.h b/src/dapf.h
-index 0d36d562547ca452a7f1a0b4a50cc934b387f96a..287f1d02f4580b5d17a21be51c697e908aa8ce50 100644
+index 0d36d56..287f1d0 100644
 --- a/src/dapf.h
 +++ b/src/dapf.h
 @@ -5,5 +5,6 @@
@@ -275,7 +275,7 @@ index 0d36d562547ca452a7f1a0b4a50cc934b387f96a..287f1d02f4580b5d17a21be51c697e90
  
  #endif
 diff --git a/src/display.c b/src/display.c
-index e1a66c7e7ed8b860bb352b70d4b1ad2d0e50a687..ccede0d6b47705b0b56917af00428f6873918bca 100644
+index e1a66c7..ccede0d 100644
 --- a/src/display.c
 +++ b/src/display.c
 @@ -652,8 +652,9 @@ int display_init(void)
@@ -292,7 +292,7 @@ index e1a66c7e7ed8b860bb352b70d4b1ad2d0e50a687..ccede0d6b47705b0b56917af00428f68
          return display_configure(NULL);
 diff --git a/src/entry_probe.h b/src/entry_probe.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..7df72117f884cba9a23ee6d76fe5220e8cfb0cc3
+index 0000000..7df7211
 --- /dev/null
 +++ b/src/entry_probe.h
 @@ -0,0 +1,67 @@
@@ -364,7 +364,7 @@ index 0000000000000000000000000000000000000000..7df72117f884cba9a23ee6d76fe5220e
 +
 +#endif
 diff --git a/src/fb.c b/src/fb.c
-index 2b85d9a4eca914738edfed37cf09b8d62cbbbb0c..e32acd1b8515c76afba1e583a2ba4d85c73b7dcc 100644
+index 2b85d9a..e32acd1 100644
 --- a/src/fb.c
 +++ b/src/fb.c
 @@ -1,6 +1,7 @@
@@ -384,7 +384,7 @@ index 2b85d9a4eca914738edfed37cf09b8d62cbbbb0c..e32acd1b8515c76afba1e583a2ba4d85
  
  static void fb_clear_font_row(u32 row)
 diff --git a/src/firmware.c b/src/firmware.c
-index e844317ef9c1da0af83f74b1566bf13c0a7d1583..e67a4c6318a389646d66cef20b77f284d80cd2a4 100644
+index e844317..e67a4c6 100644
 --- a/src/firmware.c
 +++ b/src/firmware.c
 @@ -220,6 +220,8 @@ int firmware_set_fdt(void *fdt, int node, const char *prop, const struct fw_vers
@@ -457,7 +457,7 @@ index e844317ef9c1da0af83f74b1566bf13c0a7d1583..e67a4c6318a389646d66cef20b77f284
  {
      int node = adt_path_offset(adt, "/chosen");
 diff --git a/src/firmware.h b/src/firmware.h
-index 503b6595d6b7b322fec77b23fee5785eed5abe2d..b60f39da3f3d70b2de38fccd5cab523ce37c540e 100644
+index 503b659..b60f39d 100644
 --- a/src/firmware.h
 +++ b/src/firmware.h
 @@ -203,6 +203,8 @@ struct fw_version_info {
@@ -470,7 +470,7 @@ index 503b6595d6b7b322fec77b23fee5785eed5abe2d..b60f39da3f3d70b2de38fccd5cab523c
  
  int firmware_init(void);
 diff --git a/src/kboot.c b/src/kboot.c
-index 17c650ebdc46bb7113728121dfdf3dae88ee7cef..24f163ec7ea17142f84c92a6cf20790f438bca6d 100644
+index 17c650e..24f163e 100644
 --- a/src/kboot.c
 +++ b/src/kboot.c
 @@ -3,6 +3,7 @@
@@ -1102,7 +1102,7 @@ index 17c650ebdc46bb7113728121dfdf3dae88ee7cef..24f163ec7ea17142f84c92a6cf20790f
  
      next_stage.entry = kernel;
 diff --git a/src/main.c b/src/main.c
-index d4e828c543076419aa5bbc99aa7250c79df64500..523ba60c66539c3df5b0e808bc58299bee8f5c71 100644
+index d4e828c..523ba60 100644
 --- a/src/main.c
 +++ b/src/main.c
 @@ -6,6 +6,7 @@
@@ -1218,7 +1218,7 @@ index d4e828c543076419aa5bbc99aa7250c79df64500..523ba60c66539c3df5b0e808bc58299b
  
      next_stage.entry(next_stage.args[0], next_stage.args[1], next_stage.args[2], next_stage.args[3],
 diff --git a/src/memory.c b/src/memory.c
-index d350e91ad0712e491c4e9fc53d5a8b735be81c2c..656135a2fbf721e3dc53e41dc4e51fa97ca1272f 100644
+index d350e91..656135a 100644
 --- a/src/memory.c
 +++ b/src/memory.c
 @@ -2,6 +2,7 @@
@@ -1255,7 +1255,7 @@ index d350e91ad0712e491c4e9fc53d5a8b735be81c2c..656135a2fbf721e3dc53e41dc4e51fa9
  
 diff --git a/src/neo_ssd.c b/src/neo_ssd.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..7e7f5951bfce3068cb8fe21375159812a278fdd2
+index 0000000..7e7f595
 --- /dev/null
 +++ b/src/neo_ssd.c
 @@ -0,0 +1,398 @@
@@ -1659,7 +1659,7 @@ index 0000000000000000000000000000000000000000..7e7f5951bfce3068cb8fe21375159812
 +}
 diff --git a/src/neo_ssd.h b/src/neo_ssd.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..1c34012741510893a2c64024b1cd98e3f7889848
+index 0000000..1c34012
 --- /dev/null
 +++ b/src/neo_ssd.h
 @@ -0,0 +1,32 @@
@@ -1697,7 +1697,7 @@ index 0000000000000000000000000000000000000000..1c34012741510893a2c64024b1cd98e3
 +#endif
 diff --git a/src/neo_ssd_buffers.c b/src/neo_ssd_buffers.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..bb663cf718c1d38854cdf02433eafc5b21d18b5c
+index 0000000..bb663cf
 --- /dev/null
 +++ b/src/neo_ssd_buffers.c
 @@ -0,0 +1,310 @@
@@ -2013,7 +2013,7 @@ index 0000000000000000000000000000000000000000..bb663cf718c1d38854cdf02433eafc5b
 +}
 diff --git a/src/neo_ssd_buffers.h b/src/neo_ssd_buffers.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..3f5268e5d3d303f65a274aa6b4ebc4cc747348f9
+index 0000000..3f5268e
 --- /dev/null
 +++ b/src/neo_ssd_buffers.h
 @@ -0,0 +1,29 @@
@@ -2048,7 +2048,7 @@ index 0000000000000000000000000000000000000000..3f5268e5d3d303f65a274aa6b4ebc4cc
 +#endif
 diff --git a/src/neo_ssd_console.h b/src/neo_ssd_console.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..49196e5a770e704e3f999f070ad198f3f8a5f6d6
+index 0000000..49196e5
 --- /dev/null
 +++ b/src/neo_ssd_console.h
 @@ -0,0 +1,40 @@
@@ -2094,7 +2094,7 @@ index 0000000000000000000000000000000000000000..49196e5a770e704e3f999f070ad198f3
 +#endif
 diff --git a/src/neo_ssd_firmware.c b/src/neo_ssd_firmware.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..d05471a23786ecbc80a6799eddbfe5d120150cdc
+index 0000000..d05471a
 --- /dev/null
 +++ b/src/neo_ssd_firmware.c
 @@ -0,0 +1,251 @@
@@ -2351,7 +2351,7 @@ index 0000000000000000000000000000000000000000..d05471a23786ecbc80a6799eddbfe5d1
 +}
 diff --git a/src/neo_ssd_firmware.h b/src/neo_ssd_firmware.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..0b25fabeda8390316de5895f0df1fb4191ad99f0
+index 0000000..0b25fab
 --- /dev/null
 +++ b/src/neo_ssd_firmware.h
 @@ -0,0 +1,41 @@
@@ -2398,10 +2398,10 @@ index 0000000000000000000000000000000000000000..0b25fabeda8390316de5895f0df1fb41
 +#endif
 diff --git a/src/neo_ssd_identify.c b/src/neo_ssd_identify.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..3783009d1d207e96bdb630945c5e6bf59a6a2135
+index 0000000..dbd64b5
 --- /dev/null
 +++ b/src/neo_ssd_identify.c
-@@ -0,0 +1,446 @@
+@@ -0,0 +1,449 @@
 +/* SPDX-License-Identifier: MIT */
 +/* One hard-coded Identify Controller command. No namespace I/O, RTKit, reset,
 + * SART changes, I/O queues, retries or recovery writes after a fault. */
@@ -2499,8 +2499,8 @@ index 0000000000000000000000000000000000000000..3783009d1d207e96bdb630945c5e6bf5
 +        ADT_GETPROP(adt, nub, "region-size", &region_size) < 0)
 +        goto refuse;
 +    u64 high = low + bytes;
-+    append(&o, "SSD_MEMORY usable=0x%lx+0x%lx arena=0x%lx\n", m->usable_base, m->usable_size,
-+           m->arena);
++    append(&o, "SSD_MEMORY usable=0x%lx+0x%lx arena=0x%lx bytes=0x%x\n", m->usable_base,
++           m->usable_size, m->arena, NEO_SSD_DMA_SIZE);
 +    append(&o, "SSD_MEMORY ANS region=0x%lx+0x%lx pre-loaded=%u\n", region, region_size, preloaded);
 +    reason = "usable RAM or private arena bounds";
 +    if (!inside(m->usable_base, m->usable_size, low, high) ||
@@ -2517,8 +2517,11 @@ index 0000000000000000000000000000000000000000..3783009d1d207e96bdb630945c5e6bf5
 +    /* The proposed arena must be the fresh tail of the non-freeing heap. */
 +    reason = "arena is not fresh heap memory";
 +    if (m->loaded[0].start + m->loaded[0].size != m->arena + NEO_SSD_DMA_SIZE ||
-+        m->loaded[0].start >= m->arena)
++        m->loaded[0].start >= m->arena) {
++        append(&o, "SSD_MEMORY_ARENA_MISMATCH loaded_end=0x%lx planned_end=0x%lx\n",
++               m->loaded[0].start + m->loaded[0].size, m->arena + NEO_SSD_DMA_SIZE);
 +        goto refuse;
++    }
 +    for (unsigned int i = 1; i < 3; i++)
 +        if (m->arena < m->loaded[i].start + m->loaded[i].size &&
 +            m->loaded[i].start < m->arena + NEO_SSD_DMA_SIZE)
@@ -2850,14 +2853,15 @@ index 0000000000000000000000000000000000000000..3783009d1d207e96bdb630945c5e6bf5
 +}
 diff --git a/src/neo_ssd_identify.h b/src/neo_ssd_identify.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..9a5c5066d667fe205fe8d521ced2287a662d7a6e
+index 0000000..232886b
 --- /dev/null
 +++ b/src/neo_ssd_identify.h
-@@ -0,0 +1,50 @@
+@@ -0,0 +1,51 @@
 +/* SPDX-License-Identifier: MIT */
 +#ifndef NEO_SSD_IDENTIFY_H
 +#define NEO_SSD_IDENTIFY_H
 +
++#include "../build/build_cfg.h"
 +#include "types.h"
 +
 +#define NEO_SSD_IDENTIFY_REPORT_SIZE 16384
@@ -2906,7 +2910,7 @@ index 0000000000000000000000000000000000000000..9a5c5066d667fe205fe8d521ced2287a
 +#endif
 diff --git a/src/neo_ssd_services.c b/src/neo_ssd_services.c
 new file mode 100644
-index 0000000000000000000000000000000000000000..d850f73c4cdba41e728479103bc6d57eae0cdb21
+index 0000000..d850f73
 --- /dev/null
 +++ b/src/neo_ssd_services.c
 @@ -0,0 +1,217 @@
@@ -3129,7 +3133,7 @@ index 0000000000000000000000000000000000000000..d850f73c4cdba41e728479103bc6d57e
 +}
 diff --git a/src/neo_ssd_services.h b/src/neo_ssd_services.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..7f9ee4fb1a16eae7bb33657530cc6356c79182cf
+index 0000000..7f9ee4f
 --- /dev/null
 +++ b/src/neo_ssd_services.h
 @@ -0,0 +1,19 @@
@@ -3153,7 +3157,7 @@ index 0000000000000000000000000000000000000000..7f9ee4fb1a16eae7bb33657530cc6356
 +
 +#endif
 diff --git a/src/payload.c b/src/payload.c
-index 5b1547fde0158a0aa02e66b7e07c72f3c1105b06..8457da5f610e5bd835d5da3d97b5506e9d8f4e85 100644
+index 5b1547f..8457da5 100644
 --- a/src/payload.c
 +++ b/src/payload.c
 @@ -4,6 +4,7 @@
@@ -3265,7 +3269,7 @@ index 5b1547fde0158a0aa02e66b7e07c72f3c1105b06..8457da5f610e5bd835d5da3d97b5506e
          printf("ERROR: Kernel found but no devicetree for %s available.\n", expect_compatible);
 diff --git a/src/ram_boot.h b/src/ram_boot.h
 new file mode 100644
-index 0000000000000000000000000000000000000000..adf8e9f13443400c1565f89256a1e6ac0607ac10
+index 0000000..adf8e9f
 --- /dev/null
 +++ b/src/ram_boot.h
 @@ -0,0 +1,18 @@
@@ -3288,7 +3292,7 @@ index 0000000000000000000000000000000000000000..adf8e9f13443400c1565f89256a1e6ac
 +}
 +#endif
 diff --git a/src/start.S b/src/start.S
-index aa11e18bad7f6db4d58cb4dc67e67b1238a40313..ea0c7232633611b6ce4e72666e17ab0247ef1a6a 100644
+index aa11e18..ea0c723 100644
 --- a/src/start.S
 +++ b/src/start.S
 @@ -1,6 +1,7 @@
@@ -3320,7 +3324,7 @@ index aa11e18bad7f6db4d58cb4dc67e67b1238a40313..ea0c7232633611b6ce4e72666e17ab02
  
  .pool
 diff --git a/src/startup.c b/src/startup.c
-index 61afe169c10ae68544227c541d1a3647a159ecc2..b3f6071d512025df777d5079c779c2becaa3c878 100644
+index 61afe16..b3f6071 100644
 --- a/src/startup.c
 +++ b/src/startup.c
 @@ -1,6 +1,8 @@
@@ -3475,7 +3479,7 @@ index 61afe169c10ae68544227c541d1a3647a159ecc2..b3f6071d512025df777d5079c779c2be
  }
  
 diff --git a/src/utils.c b/src/utils.c
-index fd8b2cdee610ff0dbef792ffcce94c7b06395ed2..fe8d6d458b78a6834032f0078db9665a32c39d1b 100644
+index fd8b2cd..fe8d6d4 100644
 --- a/src/utils.c
 +++ b/src/utils.c
 @@ -4,6 +4,7 @@
@@ -3500,7 +3504,7 @@ index fd8b2cdee610ff0dbef792ffcce94c7b06395ed2..fe8d6d458b78a6834032f0078db9665a
  
  void spin_init(spinlock_t *lock)
 diff --git a/src/xnuboot.h b/src/xnuboot.h
-index f713f0319caa7eac67734c6b52644fc6d13566ee..7cd75c6ff57f24b1f5e98ccee36f0f71055142f7 100644
+index f713f03..7cd75c6 100644
 --- a/src/xnuboot.h
 +++ b/src/xnuboot.h
 @@ -3,6 +3,21 @@

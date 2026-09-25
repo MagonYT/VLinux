@@ -10,8 +10,9 @@ been reported working. Internal SSD access and networking are still in developme
 The desktop currently boots from a RAM filesystem and does not persist changes.
 
 The current SSD diagnostic has reached RTKit service discovery and photographed
-a 32 KiB crashlog buffer request. The next shared-buffer/SART test is prepared;
-its native result is pending. See [hardware status](docs/HARDWARE.md) and
+a 32 KiB crashlog buffer request. The first shared-buffer test exposed a memory
+configuration mismatch, now corrected with a reproducing regression test;
+native buffer acceptance remains pending. See [hardware status](docs/HARDWARE.md) and
 [the SSD work](docs/SSD.md) for the distinction between native and automated evidence.
 
 ## Source and tools
@@ -41,6 +42,8 @@ kernel, reboot a machine, or issue native SSD-controller commands.
 - [Architecture](docs/ARCHITECTURE.md)
 - [Hardware support](docs/HARDWARE.md)
 - [SSD bring-up](docs/SSD.md)
+- [Wi-Fi and Bluetooth identity and porting path](docs/NETWORK.md)
+- [Touch ID investigation and read-only scanner](docs/TOUCH-ID.md)
 - [Development and validation](docs/DEVELOPMENT.md)
 - [Source provenance and licenses](docs/SOURCES.md)
 - [Contributing](CONTRIBUTING.md)

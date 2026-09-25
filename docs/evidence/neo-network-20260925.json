@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "ioreg_sha256": "7bf30c313d609e544761555748fdb28ecab98a870d86f6809c746e1577ecd560",
+  "scope": "Registry and installed bundle metadata only; no driver calls, firmware upload or network connections.",
+  "devices": [
+    {
+      "vendor_id": "0x14c3",
+      "device_id": "0x7932",
+      "subsystem_vendor_id": "0x14c3",
+      "subsystem_device_id": "0x7932",
+      "revision_id": "0x0000",
+      "observed_descendant_classes": [
+        "AppleSunriseHALClient",
+        "IOUserNetworkWLAN"
+      ],
+      "matching_installed_personalities": [
+        "com.apple.AppleSunriseWLAN"
+      ]
+    },
+    {
+      "vendor_id": "0x14c3",
+      "device_id": "0x793b",
+      "subsystem_vendor_id": "0x14c3",
+      "subsystem_device_id": "0x793b",
+      "revision_id": "0x0000",
+      "observed_descendant_classes": [
+        "AppleSunriseHALClient"
+      ],
+      "matching_installed_personalities": [
+        "com.apple.AppleSunriseBluetooth"
+      ]
+    }
+  ],
+  "drivers": [
+    {
+      "bundle_identifier": "com.apple.AppleSunriseWLAN",
+      "info_sha256": "8d12002118974a4c8b0c668fde90ebe0f283e5cd7e57c139ede69edeabdaecad",
+      "CFBundleVersion": "1",
+      "CFBundleShortVersionString": "1.0",
+      "pci_match_expressions": [
+        "0x792214c3 0x792314c3 0x793214c3"
+      ]
+    },
+    {
+      "bundle_identifier": "com.apple.AppleSunriseBluetooth",
+      "info_sha256": "0493fd396a05f7d972cdfdedb68d7bc984e360b4841af21aceec1544f9ffa526",
+      "CFBundleVersion": "1",
+      "CFBundleShortVersionString": "1.0",
+      "pci_match_expressions": [
+        "0x792a14c3 0x792b14c3 0x793b14c3"
+      ]
+    }
+  ],
+  "linux_support_tested": false,
+  "static_match_proves_driver_function": false
+}
