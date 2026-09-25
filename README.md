@@ -9,10 +9,10 @@ based on m1n1 and the Asahi Linux kernel with Arch Linux ARM and KDE Plasma.
 been reported working. Internal SSD access and networking are still in development.**
 The desktop currently boots from a RAM filesystem and does not persist changes.
 
-The current SSD diagnostic has reached RTKit service discovery and photographed
-a 32 KiB crashlog buffer request. The first shared-buffer test exposed a memory
-configuration mismatch, now corrected with a reproducing regression test;
-native buffer acceptance remains pending. See [hardware status](docs/HARDWARE.md) and
+The SSD diagnostic now passes memory preflight and SART mapping checks and has
+sent two firmware buffer grants. It stopped at its transmit cap while replying
+to IOReport messages. The next bounded capture addresses that cap; IOP readiness,
+buffer DMA and SSD block access remain unverified. See [hardware status](docs/HARDWARE.md) and
 [the SSD work](docs/SSD.md) for the distinction between native and automated evidence.
 
 ## Source and tools

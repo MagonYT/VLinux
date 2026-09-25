@@ -1,0 +1,35 @@
+{
+  "reported_at": "2026-09-25T08:47:43.657689+00:00",
+  "payload_sha256": "808d8b58fbb1925a44ac86920df54572c146ea5f1f70f1c3a77aba03249e3396",
+  "build_id": "800d634c93e1c5c7",
+  "identity_source": "Matching successful enrollment receipt; build ID is not visible in photograph.",
+  "status": "native_buffer_grants_transmit_limit",
+  "native_tested": true,
+  "checkpoint": 78,
+  "counts": {
+    "starts": 6,
+    "service_tx_words": 64,
+    "service_rx_messages": 27,
+    "mapped": 1,
+    "buffer_grants": 2,
+    "sart_writes": 3,
+    "nvme_commands": 0
+  },
+  "sart_mapping_readback_passed": true,
+  "iop_power_ack_seen": false,
+  "buffer_dma_contents_verified": false,
+  "native_storage_tested": false,
+  "failure": "SSD_BUF_REFUSED transmit packet/limit ep=4",
+  "scope": "Native photo confirms memory preflight and SART mapping passed; two buffer replies sent. Buffer contents were not inspected. IOP ON and NVMe readiness remain unconfirmed.",
+  "buffer_sizes": [
+    {
+      "endpoint": 1,
+      "bytes": 32768
+    },
+    {
+      "endpoint": 4,
+      "bytes": 16384
+    }
+  ],
+  "source": "Tester-supplied photograph and matching successful enrollment receipt; private artifacts omitted."
+}
