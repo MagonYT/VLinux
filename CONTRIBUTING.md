@@ -1,16 +1,20 @@
 # Contributing to VLinux
 
-Thanks for helping get Linux onto the MacBook Neo. The kernel source and
-build tooling haven't been published yet, so for now the most useful
-contributions are:
+The pinned source patches and host test are now available. Start with
+[development](docs/DEVELOPMENT.md) and [hardware status](docs/HARDWARE.md).
+Useful contributions include:
 
-- **Hardware data.** If you own a MacBook Neo, the `ioreg` and
-  `system_profiler` dumps described in [docs/HARDWARE.md](docs/HARDWARE.md)
-  help most right now.
-- **Research.** Anything you know about the Neo's boot security options,
-  SoC blocks, or peripherals. Please open an issue.
+- **Native test results.** Include the exact build ID, enrollment outcome,
+  last checkpoint and relevant diagnostic lines. Keep a working boot fallback.
+- **Source and tests.** Small driver changes, bounded fault tests, or improvements
+  that make the build independent of the local development workspace.
+- **Research.** Findings about Neo SoC blocks or peripherals, with primary sources
+  and a clear distinction between observation and inference.
 - **Docs.** Corrections and additions to `docs/`.
 
-Once the code is published, kernel patches will need a `Signed-off-by:`
+Kernel patches need a `Signed-off-by:`
 line ([Developer Certificate of Origin](https://developercertificate.org/))
 and must follow the kernel's coding style.
+
+Keep native-device evidence separate from simulated host and VM results. Do not
+attach complete macOS dumps, firmware, private identifiers or recovery logs.

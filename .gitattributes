@@ -1,0 +1,3 @@
+# Unified-diff context prefixes and verbatim upstream license copies are data.
+*.patch -whitespace
+LICENSES/** -whitespace

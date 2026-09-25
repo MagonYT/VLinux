@@ -1,45 +1,38 @@
 # Architecture
 
-VLinux follows the boot model that Asahi Linux established for Apple silicon
-Macs, and reuses its kernel tree as a base.
+The native prototype boots through Apple's custom-kernel enrollment into a
+modified m1n1 payload. m1n1 preserves live firmware memory, prepares the Linux
+device tree and hands off directly to the bundled Linux kernel and initramfs:
 
-## Boot chain
-
-```
-iBoot (Apple, in ROM/NOR)
-  └─ m1n1 stage 1         installed as a "custom kernel" via kmutil in 1TR
-       └─ m1n1 stage 2    turns the Apple device tree (ADT) into a Linux DT
-            └─ U-Boot     provides a UEFI environment
-                 └─ GRUB / systemd-boot (EFI)
-                      └─ Linux (VLinux kernel + MacBook Neo DTB)
-                           └─ Arch Linux ARM userspace
+```text
+Apple boot firmware / enrolled custom kernel
+  -> modified m1n1
+     -> Linux (16 KiB pages, Neo device tree)
+        -> RAM initramfs and compressed Arch Linux ARM root
+           -> systemd -> SDDM/Xorg -> KDE Plasma
 ```
 
-| Stage       | Source                                   | VLinux status |
-|-------------|------------------------------------------|---------------|
-| m1n1        | https://github.com/AsahiLinux/m1n1       | Needs SoC support for the Neo's chip |
-| U-Boot      | https://github.com/AsahiLinux/u-boot     | Needs the new DT |
-| Kernel      | Asahi Linux tree + VLinux patches        | This repo (coming soon) |
-| Userspace   | Arch Linux ARM aarch64 tarball           | This repo (coming soon) |
+U-Boot and an EFI bootloader are possible later stages, but are not part of the
+currently demonstrated native path. The working desktop runs with one CPU
+(`maxcpus=1`); multicore operation has not been established.
 
-The biggest open question is stage 0: whether the MacBook Neo allows booting
-a non-Apple kernel at all (the "Permissive Security" setting in the
-Startup Security Utility that other Apple silicon Macs expose). Until that is
-confirmed, everything downstream is preparation.
+The current SSD diagnostics run inside m1n1 before the Linux handoff. They retain
+firmware and private memory, perform bounded guarded operations, print results,
+and intentionally hold for a photograph. That result is separate from the
+working RAM desktop. No native SSD-backed root has been demonstrated.
 
-## Planned repository layout
+## Repository layout
 
-```
-kernel/config/   Kernel config for the MacBook Neo
-kernel/patches/  Patch series applied on top of the base kernel tree
-kernel/dts/      MacBook Neo device tree sources
-scripts/         Kernel and rootfs build scripts
-docs/            Project documentation
-```
+- `sources.lock.json`: upstream revisions, patch hashes and reconstructed file hashes.
+- `patches/m1n1/`: boot, memory preservation, input handoff and SSD experiments.
+- `patches/linux-asahi/`: Neo DT, input/DART/RTKit and limited SMC bring-up.
+- `kernel/config/`: configuration from the tested RAM desktop kernel.
+- `kernel/dts/`: input and trackpad overlays used during native bring-up.
+- `scripts/prepare-sources.py`: fetch pinned sources and apply patches without replacing existing work.
+- `scripts/ssd/`, `tests/fixtures/`: host fault test with minimal non-identifying metadata.
+- `scripts/test-center/`: Hardware, SSD, Network, Input and Boot Logs UI.
+- `tools/input-monitor.c`: Linux input-event counter; it does not record key values.
 
-## Why 16K pages
-
-Apple silicon's IOMMU (DART) works in 16K pages, so the kernel will be built with
-`CONFIG_ARM64_16K_PAGES`. Almost all of Arch Linux ARM's userspace works
-unmodified; a handful of packages that hard-code 4K pages (some builds of
-jemalloc, for instance) may need rebuilding. Track those in the issue tracker.
+Generated sources, binaries, private firmware, raw device dumps and boot receipts
+stay outside version control. The existing local enrollment workflow is specific
+to the development machine and is not distributed as a general installation tool.

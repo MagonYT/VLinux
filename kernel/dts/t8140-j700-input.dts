@@ -1,0 +1,85 @@
+// SPDX-License-Identifier: GPL-2.0+ OR MIT
+/* Experimental Neo keyboard bring-up, based on the native Plasma RAM DT.
+ * Resource evidence: build/input-research/macos/FINDINGS.md.
+ * m1n1 must preserve this boot's MTP DRAM before handing this tree to Linux.
+ */
+#include "t8140-j700.dts"
+
+&serial0 { status = "disabled"; };
+&wdt { status = "disabled"; };
+
+/ {
+	aliases {
+		mtp = &mtp;
+		keyboard = &mtp_keyboard;
+	};
+};
+
+&soc {
+	mtp: mtp@314600000 {
+		compatible = "apple,t8140-mtp";
+		reg = <0x3 0x14600000 0 0x4000>,
+		      <0x3 0x14c00000 0 0x100000>;
+		reg-names = "asc", "sram";
+		mboxes = <&mtp_mbox>;
+		/* macOS remaps SIDs 1,2,3 to 0; one Linux domain maps all four. */
+		iommus = <&mtp_dart 0>, <&mtp_dart 1>, <&mtp_dart 2>, <&mtp_dart 3>;
+		#helper-cells = <0>;
+		apple,mtp-preserve-firmware;
+		/* memory-region is added from the current ADT by m1n1. */
+	};
+
+	mtp_mbox: mbox@314608000 {
+		/* ASC v6 CPU/mailbox offsets verified against the active macOS KEXT. */
+		compatible = "apple,t8140-asc-mailbox", "apple,asc-mailbox-v4";
+		reg = <0x3 0x14608000 0 0x4000>;
+		interrupt-parent = <&aic>;
+		/* macOS indexes 1 and 2 of ADT [1153,1152,1155,1154]. */
+		interrupts = <AIC_IRQ 1152 IRQ_TYPE_LEVEL_HIGH>,
+		             <AIC_IRQ 1155 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-names = "send-empty", "recv-not-empty";
+		#mbox-cells = <0>;
+	};
+
+	mtp_dart: iommu@314800000 {
+		compatible = "apple,t8140-dart", "apple,t8110-dart";
+		reg = <0x3 0x14800000 0 0xc000>;
+		interrupt-parent = <&aic>;
+		interrupts = <AIC_IRQ 1135 IRQ_TYPE_LEVEL_HIGH>;
+		#iommu-cells = <1>;
+		/* The ADT's tagged DMA aperture, not its firmware segment virtual addresses. */
+		apple,dma-range = /bits/ 64 <0x10000004000 0xffff0000>;
+	};
+
+	mtp_dockchannel: fifo@314b14000 {
+		compatible = "apple,t8140-dockchannel", "apple,dockchannel";
+		reg = <0x3 0x14b14000 0 0x1000>;
+		reg-names = "irq";
+		interrupt-parent = <&aic>;
+		interrupts = <AIC_IRQ 1137 IRQ_TYPE_LEVEL_HIGH>;
+		ranges = <0 0x3 0x14b28000 0x10000>;
+		nonposted-mmio;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		interrupt-controller;
+		#interrupt-cells = <2>;
+
+		mtp_hid: input@8000 {
+			compatible = "apple,t8140-dockchannel-hid";
+			reg = <0x8000 0x1000>, <0xc000 0x1000>,
+			      <0x0000 0x1000>, <0x4000 0x1000>;
+			reg-names = "config", "data", "rmt-config", "rmt-data";
+			iommus = <&mtp_dart 0>, <&mtp_dart 1>, <&mtp_dart 2>, <&mtp_dart 3>;
+			interrupt-parent = <&mtp_dockchannel>;
+			/* RX bit3 is verified; TX bit2 follows the existing hardware pair. */
+			interrupts = <2 IRQ_TYPE_LEVEL_HIGH>, <3 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "tx", "rx";
+			apple,fifo-size = <0x800>;
+			apple,helper-cpu = <&mtp>;
+			apple,hid-id = <0 0 0>;
+
+			/* Do not instantiate the unverified Neo trackpad decoder/reset path. */
+			mtp_keyboard: keyboard {};
+		};
+	};
+};
