@@ -7,7 +7,7 @@
       "revision": "940439b9a407fbfc499bea933269219f3f62d4c7",
       "license": "MIT",
       "patch": "patches/m1n1/0001-neo-bringup.patch",
-      "patch_sha256": "26df3401ab277ae24ad20b8370aaa7aac9363e67c431031805fa987dbf82e434",
+      "patch_sha256": "f80438afe1157fdcd3f0c86ca02449a9df406d434bd543092c88c1e796fd9ea6",
       "files_sha256": {
         "Makefile": "e6630d6330275fc0868583f2d19154cbbb12d1e74ba2b5cc70218b1be8afe309",
         "src/dapf.c": "863961aa4982aa6b14f709d137579d75f30a7f61501812013f0e8be5a2fc8e06",
@@ -33,8 +33,8 @@
         "src/neo_ssd_console.h": "2bf89ad4f2b985e7e49305599237d52f1df77f61f550bc1c5b1d27f2185c612c",
         "src/neo_ssd_firmware.c": "c8497e8a9ee1ea07f032f7ad833361dd23f597c926298c94f607356dfc351a67",
         "src/neo_ssd_firmware.h": "3e56b17a66186fccae5861aa7c0e9a4f3eb82a4393721fe4b79d7c36fa5f3b07",
-        "src/neo_ssd_identify.c": "4c042424984d9f4987a530f3f99bd98ed4ebd960933dc32c27e8333dcabeac3b",
-        "src/neo_ssd_identify.h": "f105d2b10c0a9e84de80af2c8404d5aedbff73ee04c30664cf943fb43d5c43fe",
+        "src/neo_ssd_identify.c": "c2f16ef34bea606cbbea7d381c4e827e9b37215ac3fa8d21fa2f811b28429401",
+        "src/neo_ssd_identify.h": "d2703f7dd04b1e30c9ecf8254dc925a6c342315a33d1b05b6862d030cfc37777",
         "src/neo_ssd_services.c": "ac4d3324b615f757bd0d846fd70a635364d41474fd319acd4fe687e770a852fc",
         "src/neo_ssd_services.h": "e9e50aaba6b0217a925326a868aa664ac8117f895eb1d21d342dcf23ee2eaa35",
         "src/ram_boot.h": "75d76bb3588636e9f202619a0b9489372a7ccdccefe3e8c8fd67b1f379266019"

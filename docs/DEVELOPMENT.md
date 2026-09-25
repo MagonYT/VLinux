@@ -36,13 +36,20 @@ It runs ordinary host code with simulated MMIO, never the real storage controlle
 
 ```sh
 python3 scripts/ssd/test-buffers.py --output build/ssd-buffers-check
+python3 scripts/ssd/test-identify.py --output build/ssd-memory-64k
+python3 scripts/ssd/test-identify.py --buffer-pool --output build/ssd-memory-1m
 cd scripts
-python3 -m unittest test_driver_inventory
+python3 -m unittest test_driver_inventory test_sep_inventory test_network_inventory
 ```
 
 Choose a fresh output directory each time. The buffer test emits `result.json`
 with source/fixture hashes, counts and its actual exit status. Its fixture contains
 only the three relevant node paths and five non-identifying ADT properties.
+
+The `Host checks` workflow runs the portable metadata tests, pinned m1n1 source
+verification and all three C sanitizer configurations on an Ubuntu runner. It has
+read-only repository permissions and performs no native boot or device access.
+Local macOS results do not substitute for the first successful hosted workflow run.
 
 The exported patches were independently applied to temporary Git indexes at the
 pinned revisions. All 29 selected m1n1 files and 15 Linux files reconstructed

@@ -1,0 +1,38 @@
+name: Host checks
+
+"on":
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: host-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  policy-and-inventory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Check commit whitespace
+        run: git show --format= --check HEAD
+      - name: Test sanitized metadata tools
+        working-directory: scripts
+        run: python3 -m unittest test_driver_inventory test_sep_inventory test_network_inventory
+      - name: Prepare and verify the pinned m1n1 source
+        run: |
+          python3 scripts/prepare-sources.py --component m1n1
+          python3 scripts/prepare-sources.py --component m1n1 --verify-only
+      - name: Exercise buffer policy and injected faults
+        run: python3 scripts/ssd/test-buffers.py --output build/ci-buffers --clang clang
+      - name: Check both generated memory configurations
+        run: |
+          python3 scripts/ssd/test-identify.py --output build/ci-memory-64k --clang clang
+          python3 scripts/ssd/test-identify.py --buffer-pool --output build/ci-memory-1m --clang clang

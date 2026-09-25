@@ -14,17 +14,24 @@ separately and do not establish physical driver support.
 | Built-in keyboard | Reported working | Command -> Super/Meta; Option -> Alt |
 | Trackpad | Motion, scrolling and gestures reported working | Long-term stability and all gestures unverified |
 | Internal SSD | Firmware bring-up | Protocol/map and first buffer request captured; no Linux block device |
-| Wi-Fi | Not working in the tested desktop | Network discovery did not produce a usable interface |
-| Bluetooth | Unverified | No native connection evidence |
+| Wi-Fi | Not working in the tested desktop | macOS PCI ID `14c3:7932`; no usable Linux interface |
+| Bluetooth | Unverified | macOS PCI ID `14c3:793b`; no native Linux connection evidence |
 | USB-C | Unverified | No claim of working external input/network/storage |
 | GPU acceleration | Not implemented | Software-rendered desktop |
 | Audio | Unverified | No native playback/capture evidence |
 | SMC / power | Limited trackpad power work | Battery, suspend/resume and general power management unverified |
-| Touch ID | Not implemented | No authentication path |
+| Touch ID | Not implemented | SEP/Mesa metadata and macOS drivers identified; no Linux enrollment or bypass demonstrated |
 
-The current SSD buffer candidate has passed host fault tests and three diskless
-VM checks. It still requires its own native test. A firmware endpoint, a successful
+The first buffer candidate refused memory planning and returned to KDE; its
+1 MiB/64 KiB configuration mismatch is corrected in the next candidate. Matching
+VM and native evidence are tracked separately in [SSD bring-up](SSD.md).
+A firmware endpoint, a successful
 register read or a VM device must not be presented as usable physical SSD support.
+
+The [Touch ID investigation](TOUCH-ID.md) includes a read-only metadata scanner
+and an explicit list of unresolved protocol and storage requirements.
+The [network investigation](NETWORK.md) resolves the conflicting Broadcom device
+tree text against enumerated PCI IDs and installed Sunrise driver metadata.
 
 ## Sharing observations
 

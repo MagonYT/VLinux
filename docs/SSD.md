@@ -10,18 +10,27 @@ work investigates firmware startup in m1n1 before attempting NVMe again.
 2. The earlier Identify setup timed out waiting for controller READY (`CSTS=0`).
    No Identify command was submitted.
 3. Marker **67** confirmed RTKit protocol 12 and endpoint-map pages `0x51f`, `0x3`.
-4. Marker **71**, photographed in the latest test, confirmed START requests for
+4. Marker **71** confirmed START requests for
    endpoints 1, 2, 3, 4, 8 and 10. Endpoint 1 requested a fresh **32 KiB** crashlog
    buffer. No buffer was granted; no IOP power acknowledgment was observed.
+5. The first buffer build returned to KDE with `arena is not fresh heap memory`.
+   Its caller planned 1 MiB, but the planner compiled for 64 KiB because it did
+   not include the generated build configuration. No buffer exchange occurred.
 
 The firmware may be waiting for that first buffer reply before starting the other
 services. That is the hypothesis for the next test, not a confirmed cause.
 
 ## Current buffer candidate
 
-Build `5b71e111580dc0f7`, payload SHA-256
-`e831a726a0973cdf9377c0f4ba793e3ebaa5391935abd064391394328d6f1e78`.
+Corrected build `800d634c93e1c5c7`, payload SHA-256
+`808d8b58fbb1925a44ac86920df54572c146ea5f1f70f1c3a77aba03249e3396`.
 The payload is kept in the local test workspace; no boot binary is published here.
+
+The shared memory header now includes the generated configuration directly.
+The original host test masked the error with a command-line define. Its replacement
+uses a native-style source/build layout, checks both 64 KiB and 1 MiB builds, and
+replays the photographed allocation values. It fails against the old header and
+passes with the correction. The original ownership checks remain intact.
 
 The probe reserves an owned 1 MiB pool, requires the photographed first request,
 checks the entire SART version-3 table and requires slot 2 to be empty. It zeros
@@ -52,7 +61,8 @@ fault cases. The new reserved-pool size also passes memory/overlap tests locally
 The portable buffer test here uses the same C harness and a minimal fixture with
 only compatibility strings, a quiesced property and the SART version.
 
-The local payload passes 174 packaging/enrollment/report regressions, exact early
-m1n1 startup emulation, and Arch/systemd, headless Plasma and graphical desktop/input
-VM checks. All five Test Center pages were reviewed. VMs do not execute the Neo's
-m1n1/SART/mailbox path, so those results do not replace the next physical test.
+The corrected payload passes 195 host regressions and exact early m1n1 startup
+emulation. Its matching systemd, headless Plasma and graphical desktop/input VM
+checks pass, including all five report pages. It is staged locally for the next
+native test. VMs do not execute the Neo's m1n1/SART/mailbox path, so those results do
+not replace the next physical test.
