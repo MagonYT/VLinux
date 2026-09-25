@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "snapshot_date": "2026-09-25",
+  "components": {
+    "m1n1": {
+      "url": "https://github.com/rusch95/m1n1.git",
+      "revision": "940439b9a407fbfc499bea933269219f3f62d4c7",
+      "license": "MIT",
+      "patch": "patches/m1n1/0001-neo-bringup.patch",
+      "patch_sha256": "26df3401ab277ae24ad20b8370aaa7aac9363e67c431031805fa987dbf82e434",
+      "files_sha256": {
+        "Makefile": "e6630d6330275fc0868583f2d19154cbbb12d1e74ba2b5cc70218b1be8afe309",
+        "src/dapf.c": "863961aa4982aa6b14f709d137579d75f30a7f61501812013f0e8be5a2fc8e06",
+        "src/dapf.h": "b638e36b0a215a3f583edd7cf83d167b5477e6d0f0c89e03cad76a3bf4bf989a",
+        "src/display.c": "8e7c938db98dd178a68e544d8b9d17741c7e2422afb699a3797b994a3f964ddd",
+        "src/fb.c": "2c178383e816bbff0486cadc373a913b5a43f6c8e56f6e080747a0f53b00ec80",
+        "src/firmware.c": "0488b97e9a6657cdce1c3716f0abd65615a221c5a86300b6da83054e7b94a236",
+        "src/firmware.h": "1db5fe6a47d04f980e769f779883236f6b484d515e006820e6dab59887f4a37b",
+        "src/kboot.c": "77e41a7921a7269e41f8ea3b6fbcd8bb8452600b28cbe2cc274de23a3edd5199",
+        "src/main.c": "8b8d45f8508643efff2a7add62acb3321ab93989c6a50ed00338e4d2fd6a1d4b",
+        "src/memory.c": "6a9fc07d6b0d376aefed962bb73e17033c1f441605b0e8a4e47cf70fbb79ed29",
+        "src/payload.c": "a29d78ee632626d63250e9a6531789a9d10a00391ef5a83483236142a9453e7f",
+        "src/start.S": "2f50cc78eed5ff9eedb11b29d2782476386b1a4562b8fd1f410d7b15084eb2aa",
+        "src/startup.c": "cf4393434935e8bff4b30965fcb908955f4f5ee690cbe16d8f3c314d3463e7de",
+        "src/utils.c": "abfcbc22b70c6d13d5571c3ffaef33f611012f8a639dd6d06494428336724de4",
+        "src/xnuboot.h": "eb25147186d25de36feb5475ef9a682dec0ccdbb6847d957eeddc6bf9e95ab04",
+        "src/boot_trace.h": "686410bcd4387b431d7e90751b01b80851a58480bbeddb2e42736f86e41ab823",
+        "src/entry_probe.h": "07d43e4fa333fbb4a283e8d9c1c9981bffd4042448bb936c4525eaf014436477",
+        "src/neo_ssd.c": "c6dd9af1032084443529af6cfc0633cddf22495911eb681dc18fa6e1f5f9018e",
+        "src/neo_ssd.h": "430eb8f2bcbdeebb57406642626cf79b3ceb22a7e68926d66a2d73a65fd6c8e3",
+        "src/neo_ssd_buffers.c": "22d880381673fda69200e88564f8bde5489a1fc0371b405e2f59d7d10b7f9270",
+        "src/neo_ssd_buffers.h": "fcfbc52e2931d7cf563757c1cc6266fb92f92aee74e139971afd35e904395f2f",
+        "src/neo_ssd_console.h": "2bf89ad4f2b985e7e49305599237d52f1df77f61f550bc1c5b1d27f2185c612c",
+        "src/neo_ssd_firmware.c": "c8497e8a9ee1ea07f032f7ad833361dd23f597c926298c94f607356dfc351a67",
+        "src/neo_ssd_firmware.h": "3e56b17a66186fccae5861aa7c0e9a4f3eb82a4393721fe4b79d7c36fa5f3b07",
+        "src/neo_ssd_identify.c": "4c042424984d9f4987a530f3f99bd98ed4ebd960933dc32c27e8333dcabeac3b",
+        "src/neo_ssd_identify.h": "f105d2b10c0a9e84de80af2c8404d5aedbff73ee04c30664cf943fb43d5c43fe",
+        "src/neo_ssd_services.c": "ac4d3324b615f757bd0d846fd70a635364d41474fd319acd4fe687e770a852fc",
+        "src/neo_ssd_services.h": "e9e50aaba6b0217a925326a868aa664ac8117f895eb1d21d342dcf23ee2eaa35",
+        "src/ram_boot.h": "75d76bb3588636e9f202619a0b9489372a7ccdccefe3e8c8fd67b1f379266019"
+      }
+    },
+    "linux-asahi": {
+      "url": "https://github.com/AsahiLinux/linux.git",
+      "revision": "8de57da87a9b807b52d6844270aecf498559c9ed",
+      "license": "GPL-2.0-only; per-file SPDX exceptions retained",
+      "patch": "patches/linux-asahi/0001-neo-bringup.patch",
+      "patch_sha256": "831e412c5f6eb5b085783ad3f6da974d3659006c56a6b7197d314742809f664b",
+      "files_sha256": {
+        "arch/arm64/boot/dts/apple/Makefile": "ad229f654cf808696480efb4eab44feea79a5cc438f329cb46744b96235b27dd",
+        "arch/arm64/boot/dts/apple/t8140-j700.dts": "b8c5d3cc36c9f6155177f3058ded781922391997f7b3de7dbdc0bc76a530f46b",
+        "arch/arm64/boot/dts/apple/t8140-pmgr.dtsi": "a372987c035006a568a82c333f78957861b7ae214f51b85524ba3c5053372086",
+        "arch/arm64/boot/dts/apple/t8140.dtsi": "0a10ee6d3adc4cf7206d9e8e5df6c1ae2e50fbdd61e0c40dde25ae4af9041ecb",
+        "drivers/hid/dockchannel-hid/Makefile": "2a43f0d15de91fcd5735ad91c64a6db70811c25ec5ee37b635051a564776a4ba",
+        "drivers/hid/dockchannel-hid/dockchannel-hid.c": "e3c18dd9540fc5264ee931de2ad27f41c1b019d91f74c5eeffc956735264f7db",
+        "drivers/hid/dockchannel-hid/hid-neo-trackpad.c": "34dafd2e358080b182ba835e7280f7b7686c28c0a5c17b7df67106f94b97686e",
+        "drivers/hid/dockchannel-hid/neo-trackpad.h": "4560d852c513825984e310b29d7e8f6f9b811270ff38e6949bfed52a8dfd99de",
+        "drivers/iommu/apple-dart.c": "053efdb69e1638469fd23a2261df7dceece7c484563cbf5188572e1043ffb95c",
+        "drivers/mfd/macsmc.c": "459d7bdc3063d5991ff168ef668ac6f640254237e9598fc9b573c13bc00692f9",
+        "drivers/soc/apple/rtkit-helper.c": "efd029b3f17eefc723d4b2c4f0be163b012ec9234a1d3101e19255310e5de326",
+        "include/linux/mfd/macsmc.h": "c6538ac44ade7f2f2e494187192969b325e5fa8b2f4f5fc581cda685c7efce9e",
+        "scripts/mod/Makefile": "8e29514252ebc029f1e44498b8802244d83b629ee2d8de5bf501434e5d59123f",
+        "usr/Makefile": "1ad25fe1048f648754fb28848d16175cde4506c5494392843b3d2613ce09cae4",
+        ".host_include/vlinux_cpio_compat.h": "4cec13f46448587534f903547da64c06a0ff84766da269fdb11de21639a77d27"
+      }
+    }
+  }
+}

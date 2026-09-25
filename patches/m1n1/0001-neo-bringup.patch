@@ -1,0 +1,3527 @@
+diff --git a/Makefile b/Makefile
+index 1ee603e580e5e26b3b4be2477e2c953986bfd6af..0e1ece647333261ced5c9e5e3272a261395e6321 100644
+--- a/Makefile
++++ b/Makefile
+@@ -68,6 +68,66 @@ BASE_CFLAGS := -O2 -Wall -g -Wundef -Werror=strict-prototypes -fno-common -fno-P
+ CFLAGS := $(BASE_CFLAGS) -mgeneral-regs-only
+ 
+ CFG :=
++ifeq ($(ENTRY_PROBE),1)
++CFG += VLINUX_ENTRY_PROBE
++endif
++ifeq ($(BOOT_TRACE),1)
++CFG += VLINUX_BOOT_TRACE
++endif
++ifeq ($(MMU_TRACE),1)
++CFG += VLINUX_MMU_TRACE
++endif
++ifeq ($(INIT_TRACE),1)
++CFG += VLINUX_INIT_TRACE
++endif
++ifeq ($(RAM_BOOT),1)
++CFG += VLINUX_RAM_BOOT
++endif
++ifeq ($(HANDOFF_TRACE),1)
++CFG += VLINUX_HANDOFF_TRACE
++endif
++ifeq ($(SSD_PROBE),1)
++ifneq ($(RAM_BOOT),1)
++$(error SSD_PROBE requires RAM_BOOT=1)
++endif
++CFG += VLINUX_SSD_PROBE
++endif
++ifeq ($(SSD_POWER_PROBE),1)
++ifneq ($(SSD_PROBE),1)
++$(error SSD_POWER_PROBE requires SSD_PROBE=1)
++endif
++CFG += VLINUX_SSD_POWER_PROBE
++endif
++ifeq ($(SSD_QUEUE_PROBE),1)
++ifneq ($(SSD_POWER_PROBE),1)
++$(error SSD_QUEUE_PROBE requires SSD_POWER_PROBE=1)
++endif
++CFG += VLINUX_SSD_QUEUE_PROBE
++endif
++ifeq ($(SSD_IDENTIFY_PROBE),1)
++ifneq ($(SSD_QUEUE_PROBE),1)
++$(error SSD_IDENTIFY_PROBE requires SSD_QUEUE_PROBE=1)
++endif
++CFG += VLINUX_SSD_IDENTIFY_PROBE
++endif
++ifeq ($(SSD_FIRMWARE_PROBE),1)
++ifneq ($(SSD_IDENTIFY_PROBE),1)
++$(error SSD_FIRMWARE_PROBE requires SSD_IDENTIFY_PROBE=1 for memory reservations)
++endif
++CFG += VLINUX_SSD_FIRMWARE_PROBE
++endif
++ifeq ($(SSD_SERVICE_PROBE),1)
++ifneq ($(SSD_FIRMWARE_PROBE),1)
++$(error SSD_SERVICE_PROBE requires SSD_FIRMWARE_PROBE=1)
++endif
++CFG += VLINUX_SSD_SERVICE_PROBE
++endif
++ifeq ($(SSD_BUFFER_PROBE),1)
++ifneq ($(SSD_SERVICE_PROBE),1)
++$(error SSD_BUFFER_PROBE requires SSD_SERVICE_PROBE=1)
++endif
++CFG += VLINUX_SSD_BUFFER_PROBE
++endif
+ ifeq ($(RELEASE),1)
+ CFG += RELEASE
+ endif
+@@ -183,6 +243,22 @@ OBJECTS := \
+ 	$(DCP_OBJECTS) \
+ 	$(MINILZLIB_OBJECTS) $(TINF_OBJECTS) $(DLMALLOC_OBJECTS) $(LIBFDT_OBJECTS)
+ 
++ifeq ($(SSD_PROBE),1)
++OBJECTS += neo_ssd.o
++endif
++ifeq ($(SSD_IDENTIFY_PROBE),1)
++OBJECTS += neo_ssd_identify.o
++endif
++ifeq ($(SSD_FIRMWARE_PROBE),1)
++OBJECTS += neo_ssd_firmware.o
++endif
++ifeq ($(SSD_SERVICE_PROBE),1)
++OBJECTS += neo_ssd_services.o
++endif
++ifeq ($(SSD_BUFFER_PROBE),1)
++OBJECTS += neo_ssd_buffers.o
++endif
++
+ FP_OBJECTS := \
+ 	kboot_gpu.o \
+ 	math/expf.o \
+diff --git a/src/boot_trace.h b/src/boot_trace.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..07f4b7f833179e09681ea396ae83e3681b06f021
+--- /dev/null
++++ b/src/boot_trace.h
+@@ -0,0 +1,39 @@
++/* SPDX-License-Identifier: MIT */
++#ifndef BOOT_TRACE_H
++#define BOOT_TRACE_H
++#include "../build/build_cfg.h"
++#if defined(VLINUX_ENTRY_PROBE) && defined(VLINUX_BOOT_TRACE)
++#error "ENTRY_PROBE and BOOT_TRACE are separate diagnostics"
++#endif
++#if defined(VLINUX_MMU_TRACE) && !defined(VLINUX_BOOT_TRACE)
++#error "MMU_TRACE requires BOOT_TRACE=1"
++#endif
++#if defined(VLINUX_INIT_TRACE) && !defined(VLINUX_MMU_TRACE)
++#error "INIT_TRACE requires MMU_TRACE=1 and BOOT_TRACE=1"
++#endif
++#if defined(VLINUX_RAM_BOOT) && !defined(VLINUX_INIT_TRACE)
++#error "RAM_BOOT requires INIT_TRACE=1, MMU_TRACE=1 and BOOT_TRACE=1"
++#endif
++#if defined(VLINUX_HANDOFF_TRACE) && !defined(VLINUX_RAM_BOOT)
++#error "HANDOFF_TRACE requires RAM_BOOT=1 and its trace dependencies"
++#endif
++#ifdef VLINUX_INIT_TRACE
++void boot_trace_refresh(void);
++#else
++static inline void boot_trace_refresh(void) {}
++#endif
++#ifdef VLINUX_BOOT_TRACE
++void boot_checkpoint(unsigned int stage);
++__attribute__((noreturn)) void boot_trace_hold(void);
++#else
++static inline void boot_checkpoint(unsigned int stage) { (void)stage; }
++#endif
++static inline void mmu_checkpoint(unsigned int stage)
++{
++#ifdef VLINUX_MMU_TRACE
++    boot_checkpoint(stage);
++#else
++    (void)stage;
++#endif
++}
++#endif
+diff --git a/src/dapf.c b/src/dapf.c
+index 3b4b773dc62da2b1ed1c31a8104da7ffa5d8bba6..33524dac1150cd9481ec5e03141470eab76c5ed8 100644
+--- a/src/dapf.c
++++ b/src/dapf.c
+@@ -69,6 +69,121 @@ struct dapf_t8110b_config {
+     u32 pad;
+ } PACKED;
+ 
++#define NEO_MTP_DAPF_COUNT  10
++#define NEO_MTP_DAPF_STRIDE 0x40
++#define NEO_MTP_DAPF_LOCK   BIT(2)
++
++/* SPTM compares only implemented address, SID and control bits. */
++static bool dapf_neo_mtp_matches(u64 base, const struct dapf_t8110_config *config, bool report)
++{
++    const u32 offsets[] = {0x08, 0x0c, 0x10, 0x14, 0x20, 0x00};
++    const u32 masks[] = {0xfffffffc, 0xf, 0xfffffffc, 0xf, 0xffff, 0x333};
++    bool matches = true;
++
++    for (unsigned i = 0; i < NEO_MTP_DAPF_COUNT; i++) {
++        const u32 values[] = {(u32)config[i].start, config[i].start >> 32,
++                             (u32)config[i].end,   config[i].end >> 32,
++                             config[i].r20,       0x31};
++        for (unsigned j = 0; j < ARRAY_SIZE(offsets); j++) {
++            u32 value = read32(base + i * NEO_MTP_DAPF_STRIDE + offsets[j]);
++            if ((value & masks[j]) != (values[j] & masks[j])) {
++                matches = false;
++                if (report)
++                    printf("dapf: Neo MTP entry %u +0x%x: read %08x expected %08x mask %08x\n", i,
++                           offsets[j], value, values[j], masks[j]);
++            }
++        }
++    }
++
++    return matches;
++}
++
++/*
++ * Restore only the observed Neo MTP filter schema. No DART/TCR, other DAPF,
++ * clock, or lock state is changed here. The caller must abort handoff on error.
++ */
++int dapf_init_neo_mtp(void)
++{
++    const char *path = "/arm-io/dart-mtp";
++    struct dapf_t8110_config config[NEO_MTP_DAPF_COUNT];
++    int dart_path[8];
++    u64 dart_base, dart_size, dapf_base, dapf_size;
++    u32 length;
++    int node = adt_path_offset_trace(adt, path, dart_path);
++
++    if (node < 0 || !adt_is_compatible(adt, node, "dart,t8110")) {
++        printf("dapf: Neo MTP node/compatible missing\n");
++        return -1;
++    }
++    if (adt_get_reg(adt, dart_path, "reg", 0, &dart_base, &dart_size) < 0 ||
++        adt_get_reg(adt, dart_path, "reg", 1, &dapf_base, &dapf_size) < 0 ||
++        dart_base != 0x314800000 || dart_size < 0xc000 || dapf_base != 0x314810000 ||
++        dapf_size != 0x4000) {
++        printf("dapf: Neo MTP register layout differs from verified hardware\n");
++        return -1;
++    }
++
++    const void *property = adt_getprop(adt, node, "dapf-instance-0", &length);
++    if (!property || sizeof(struct dapf_t8110_config) != 52 || length != sizeof(config) ||
++        NEO_MTP_DAPF_COUNT > dapf_size / NEO_MTP_DAPF_STRIDE) {
++        printf("dapf: Neo MTP requires the verified 10 x 52-byte descriptor schema\n");
++        return -1;
++    }
++    memcpy(config, property, sizeof(config));
++
++    /* Validate every descriptor before even reading the DAPF registers. */
++    for (unsigned i = 0; i < ARRAY_SIZE(config); i++) {
++        const struct dapf_t8110_config *c = &config[i];
++        bool unknown = c->unk1 || c->unk3 || c->unk4;
++        for (unsigned j = 0; j < ARRAY_SIZE(c->unk2); j++)
++            unknown |= c->unk2[j] != 0;
++
++        /* DAPF address readback exposes 36 bits, independently of DART IAS. */
++        if (!c->start || c->start > c->end || c->end >= BIT(36) || !ram_base || c->end >= ram_base ||
++            c->r20 != 1 || c->r4 != 0 || c->r0_hi != 3 || c->r0_lo != 1 || unknown) {
++            printf("dapf: Neo MTP descriptor %u differs from verified schema\n", i);
++            return -1;
++        }
++    }
++
++    u32 protect = read32(dart_base + 0x200);
++    u32 protect_lock = read32(dart_base + 0x208);
++    printf("dapf: Neo MTP PROTECT=%08x PROTECT_LOCK=%08x\n", protect, protect_lock);
++    if (dapf_neo_mtp_matches(dapf_base, config, false)) {
++        printf("dapf: Neo MTP verified %u existing entries, no writes\n", NEO_MTP_DAPF_COUNT);
++        return NEO_MTP_DAPF_COUNT;
++    }
++    /* Be conservative even when only one of the two protection bits is set. */
++    if ((protect | protect_lock) & NEO_MTP_DAPF_LOCK) {
++        printf("dapf: Neo MTP locked configuration does not match ADT; refusing writes\n");
++        return -1;
++    }
++
++    for (unsigned i = 0; i < ARRAY_SIZE(config); i++) {
++        u64 base = dapf_base + i * NEO_MTP_DAPF_STRIDE;
++        /* +4 has no recovered SPTM writer: preserve it, even though ADT r4=0. */
++        printf("dapf: Neo MTP entry %u %lx..%lx SID=%x control=31 preserved+4=%08x\n", i,
++               config[i].start, config[i].end, config[i].r20, read32(base + 4));
++        write32(base + 0x08, config[i].start);
++        write32(base + 0x0c, config[i].start >> 32);
++        write32(base + 0x10, config[i].end);
++        write32(base + 0x14, config[i].end >> 32);
++        write32(base + 0x20, config[i].r20);
++    }
++    dma_wmb();
++    for (unsigned i = 0; i < ARRAY_SIZE(config); i++)
++        write32(dapf_base + i * NEO_MTP_DAPF_STRIDE, 0x31);
++
++    sysop("dsb sy");
++    /* Readback both flushes posted writes and checks every programmed field. */
++    if (!dapf_neo_mtp_matches(dapf_base, config, true)) {
++        printf("dapf: Neo MTP readback failed; abort handoff\n");
++        return -1;
++    }
++    printf("dapf: Neo MTP restored and verified %u entries\n", NEO_MTP_DAPF_COUNT);
++    return NEO_MTP_DAPF_COUNT;
++}
++
+ static int dapf_init_t8110a(u64 base, struct dapf_t8110_config *config, u32 length)
+ {
+     int count = length / sizeof(*config);
+diff --git a/src/dapf.h b/src/dapf.h
+index 0d36d562547ca452a7f1a0b4a50cc934b387f96a..287f1d02f4580b5d17a21be51c697e908aa8ce50 100644
+--- a/src/dapf.h
++++ b/src/dapf.h
+@@ -5,5 +5,6 @@
+ 
+ int dapf_init_all(void);
+ int dapf_init(const char *path, int index);
++int dapf_init_neo_mtp(void);
+ 
+ #endif
+diff --git a/src/display.c b/src/display.c
+index e1a66c7e7ed8b860bb352b70d4b1ad2d0e50a687..ccede0d6b47705b0b56917af00428f6873918bca 100644
+--- a/src/display.c
++++ b/src/display.c
+@@ -652,8 +652,9 @@ int display_init(void)
+         fb_clear_direct(); // Old m1n1 stage1 ends up with an ugly logo situation, clear it.
+         return display_configure(NULL);
+ #ifndef CHAINLOADING
+-    } else if (!has_notch && firmware_sfw_in_range(V15_0B1, FW_MAX) &&
+-               os_firmware.version < V15_0B1) {
++    } else if (is_mac && (chip_id == T8103 || chip_id == T8112) && !has_notch &&
++               firmware_sfw_in_range(V15_0B1, FW_MAX) &&
++               firmware_os_in_range(V11_0B1, V15_0B1)) {
+         printf("display: Internal display on t8103 or t8112 with Sequoia SFW, power cycling\n");
+         display_needs_power_cycle = true;
+         return display_configure(NULL);
+diff --git a/src/entry_probe.h b/src/entry_probe.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..7df72117f884cba9a23ee6d76fe5220e8cfb0cc3
+--- /dev/null
++++ b/src/entry_probe.h
+@@ -0,0 +1,67 @@
++/* SPDX-License-Identifier: MIT */
++#ifndef ENTRY_PROBE_H
++#define ENTRY_PROBE_H
++
++#include "types.h"
++#include "xnuboot.h"
++
++#define ENTRY_PROBE_X 8
++#define ENTRY_PROBE_Y 8
++#define ENTRY_PROBE_WIDTH 128
++#define ENTRY_PROBE_HEIGHT 32
++
++/* Only touches a small rectangle in an already supplied framebuffer. It does
++ * not configure scanout, map memory, allocate, or access a controller register.
++ * Callers must establish that these are the physical boot framebuffer/DRAM
++ * addresses and arrange cache visibility after painting. */
++static inline bool entry_probe_paint_stage(const struct boot_video *video, u64 dram_base,
++                                           u64 dram_size, unsigned int stage)
++{
++    u64 depth = video->depth & 0xff;
++    if (stage > 99 || !video->base || (video->base & 3) || (video->stride & 3) ||
++        video->width < 160 || video->width > 8192 || video->height < 64 ||
++        video->height > 8192 || video->stride < video->width * 4 ||
++        video->stride > 65536 || (depth != 24 && depth != 30 && depth != 32))
++        return false;
++
++    u64 size = video->stride * video->height;
++    if (!dram_size || dram_base > UINT64_MAX - dram_size || size > 128 * 1024 * 1024 ||
++        video->base < dram_base || video->base - dram_base >= dram_size ||
++        size > dram_size - (video->base - dram_base))
++        return false;
++
++    u32 white = depth == 30 ? 0x3fffffff : 0x00ffffff;
++    for (u32 y = 0; y < ENTRY_PROBE_HEIGHT; y++) {
++        volatile u32 *row = (volatile u32 *)(video->base +
++            (ENTRY_PROBE_Y + y) * video->stride + ENTRY_PROBE_X * 4);
++        /* 3x5 decimal digits, scaled 4x. Stage zero keeps the proven barcode. */
++        static const u16 digits[10] = {
++            0x7b6f, 0x2492, 0x73e7, 0x73cf, 0x5bc9,
++            0x79cf, 0x79ef, 0x7249, 0x7bef, 0x7bcf,
++        };
++        for (u32 x = 0; x < ENTRY_PROBE_WIDTH; x++) {
++            bool lit = y == 0 || y == ENTRY_PROBE_HEIGHT - 1 ||
++                       x == 0 || x == ENTRY_PROBE_WIDTH - 1;
++            if (!stage) {
++                lit |= (x / 16) % 2 == 0;
++            } else if (y >= 6 && y < 26 && x >= 48 && x < 76) {
++                u32 dx = x - 48;
++                if (dx < 12 || dx >= 16) {
++                    unsigned int digit = dx < 12 ? stage / 10 : stage % 10;
++                    unsigned int col = (dx < 12 ? dx : dx - 16) / 4;
++                    unsigned int bit = 14 - ((y - 6) / 4 * 3 + col);
++                    lit |= (digits[digit] >> bit) & 1;
++                }
++            }
++            row[x] = lit ? white : 0;
++        }
++    }
++    return true;
++}
++
++static inline bool entry_probe_paint(const struct boot_video *video, u64 dram_base, u64 dram_size)
++{
++    return entry_probe_paint_stage(video, dram_base, dram_size, 0);
++}
++
++#endif
+diff --git a/src/fb.c b/src/fb.c
+index 2b85d9a4eca914738edfed37cf09b8d62cbbbb0c..e32acd1b8515c76afba1e583a2ba4d85c73b7dcc 100644
+--- a/src/fb.c
++++ b/src/fb.c
+@@ -1,6 +1,7 @@
+ /* SPDX-License-Identifier: MIT */
+ 
+ #include "fb.h"
++#include "boot_trace.h"
+ #include "assert.h"
+ #include "iodev.h"
+ #include "malloc.h"
+@@ -78,6 +79,7 @@ struct image orig_logo;
+ void fb_update(void)
+ {
+     memcpy128(fb.hwptr, fb.ptr, fb.size);
++    boot_trace_refresh(); // Keep diagnostic digits visible over console updates.
+ }
+ 
+ static void fb_clear_font_row(u32 row)
+diff --git a/src/firmware.c b/src/firmware.c
+index e844317ef9c1da0af83f74b1566bf13c0a7d1583..e67a4c6318a389646d66cef20b77f284d80cd2a4 100644
+--- a/src/firmware.c
++++ b/src/firmware.c
+@@ -220,6 +220,8 @@ int firmware_set_fdt(void *fdt, int node, const char *prop, const struct fw_vers
+ void firmware_parse_version(const char *s, u32 *out)
+ {
+     memset(out, 0, sizeof(*out) * IBOOT_VER_COMP);
++    if (!s)
++        return;
+ 
+     for (int i = 0; i < IBOOT_VER_COMP; i++) {
+         while (*s && !(*s >= '0' && *s <= '9'))
+@@ -248,23 +250,24 @@ static void detect_firmware(struct fw_version_info *info, const char *ver)
+ bool firmware_iboot_in_range(u32 min[IBOOT_VER_COMP], u32 max[IBOOT_VER_COMP],
+                              u32 this[IBOOT_VER_COMP])
+ {
+-    int i;
+-    for (i = 0; i < IBOOT_VER_COMP; i++)
+-        if (this[i] != min[i])
++    for (int i = 0; i < IBOOT_VER_COMP; i++) {
++        if (this[i] < min[i])
++            return false;
++        if (this[i] > min[i])
+             break;
++    }
+ 
+-    if (this[i] < min[i])
+-        return false;
+-
+-    for (i = 0; i < IBOOT_VER_COMP; i++)
++    for (int i = 0; i < IBOOT_VER_COMP; i++) {
+         if (this[i] != max[i])
+-            break;
++            return this[i] < max[i];
++    }
+ 
+-    return this[i] < max[i];
++    return false; // The upper bound is exclusive, including exact equality.
+ }
+ 
+ // Note: semi-open range
+-bool firmware_sfw_in_range(enum fw_version lower_bound, enum fw_version upper_bound)
++static bool firmware_in_range(const struct fw_version_info *info, enum fw_version lower_bound,
++                              enum fw_version upper_bound)
+ {
+     u32 min[IBOOT_VER_COMP] = {0};
+     u32 max[IBOOT_VER_COMP] = {UINT32_MAX};
+@@ -276,11 +279,23 @@ bool firmware_sfw_in_range(enum fw_version lower_bound, enum fw_version upper_bo
+     if (upper_bound > V_UNKNOWN && upper_bound < NUM_FW_VERSIONS)
+         firmware_parse_version(fw_versions[upper_bound].iboot, max);
+ 
+-    firmware_parse_version(system_firmware.iboot, this);
++    firmware_parse_version(info->iboot, this);
++    if (!this[0])
++        return false;
+ 
+     return firmware_iboot_in_range(min, max, this);
+ }
+ 
++bool firmware_sfw_in_range(enum fw_version lower_bound, enum fw_version upper_bound)
++{
++    return firmware_in_range(&system_firmware, lower_bound, upper_bound);
++}
++
++bool firmware_os_in_range(enum fw_version lower_bound, enum fw_version upper_bound)
++{
++    return firmware_in_range(&os_firmware, lower_bound, upper_bound);
++}
++
+ int firmware_init(void)
+ {
+     int node = adt_path_offset(adt, "/chosen");
+diff --git a/src/firmware.h b/src/firmware.h
+index 503b6595d6b7b322fec77b23fee5785eed5abe2d..b60f39da3f3d70b2de38fccd5cab523ce37c540e 100644
+--- a/src/firmware.h
++++ b/src/firmware.h
+@@ -203,6 +203,8 @@ struct fw_version_info {
+ 
+ extern struct fw_version_info os_firmware;
+ extern struct fw_version_info system_firmware;
++
++bool firmware_os_in_range(enum fw_version lower_bound, enum fw_version upper_bound);
+ extern const struct fw_version_info fw_versions[NUM_FW_VERSIONS];
+ 
+ int firmware_init(void);
+diff --git a/src/kboot.c b/src/kboot.c
+index 17c650ebdc46bb7113728121dfdf3dae88ee7cef..24f163ec7ea17142f84c92a6cf20790f438bca6d 100644
+--- a/src/kboot.c
++++ b/src/kboot.c
+@@ -3,6 +3,7 @@
+ #include <stdint.h>
+ 
+ #include "kboot.h"
++#include "boot_trace.h"
+ #include "adt.h"
+ #include "assert.h"
+ #include "clk.h"
+@@ -11,12 +12,14 @@
+ #include "display.h"
+ #include "exception.h"
+ #include "firmware.h"
++#include "heapblock.h"
+ #include "iodev.h"
+ #include "isp.h"
+ #include "kboot_atc.h"
+ #include "malloc.h"
+ #include "mcc.h"
+ #include "memory.h"
++#include "neo_ssd.h"
+ #include "pcie.h"
+ #include "pmgr.h"
+ #include "sep.h"
+@@ -1517,6 +1520,524 @@ static int dt_device_add_mem_region(const char *alias, uint32_t phandle, const c
+     return 0;
+ }
+ 
++static int dt_reserve_mtp_dram(void)
++{
++    int helper = fdt_node_offset_by_compatible(dt, -1, "apple,t8140-mtp");
++    if (helper < 0 || !fdt_getprop(dt, helper, "apple,mtp-preserve-firmware", NULL))
++        return 0;
++    if (fdt_path_offset(dt, "mtp") != helper)
++        bail("FDT: MTP memory opt-in requires the mtp alias\n");
++    if (fdt_getprop(dt, helper, "memory-region", NULL))
++        bail("FDT: MTP already has static memory-region entries\n");
++
++    int chosen = adt_path_offset(adt, "/chosen");
++    u64 dram_base, dram_size;
++    if (chosen < 0 || ADT_GETPROP(adt, chosen, "dram-base", &dram_base) < 0 ||
++        ADT_GETPROP(adt, chosen, "dram-size", &dram_size) < 0 || !dram_size ||
++        dram_base + dram_size < dram_base)
++        bail("ADT: Missing or invalid DRAM bounds for MTP reservations\n");
++    u64 dram_end = dram_base + dram_size;
++
++    int anode = adt_path_offset(adt, "/arm-io/mtp/iop-mtp-nub");
++    if (anode < 0)
++        bail("ADT: MTP firmware node not found\n");
++
++    u32 preloaded = 0;
++    if (ADT_GETPROP(adt, anode, "pre-loaded", &preloaded) < 0 || preloaded != 1)
++        bail("ADT: MTP runtime firmware is not marked pre-loaded\n");
++
++    u32 length = 0;
++    const struct adt_segment_ranges *segments =
++        adt_getprop(adt, anode, "segment-ranges", &length);
++    if (!segments || !length || length % sizeof(*segments) ||
++        length / sizeof(*segments) > 16)
++        bail("ADT: Invalid MTP segment-ranges\n");
++
++    /* The kernel and initrd are loaded before FDT preparation. Reserving their
++     * pages now would not restore firmware data already overwritten by loading.
++     * Also reject page-sharing: Linux and firmware must not own one 16 KiB page.
++     */
++    u64 heap_start = cur_boot_args.top_of_kernel_data;
++    u64 heap_end = (u64)heapblock_alloc_aligned(0, 1);
++    u64 initrd_begin = (u64)initrd_start;
++    u64 initrd_end = initrd_begin + initrd_size;
++    if (heap_end < heap_start || (u64)_end < (u64)_base ||
++        (initrd_size && (!initrd_begin || initrd_end < initrd_begin)))
++        bail("FDT: Invalid loaded-memory bounds for MTP preservation\n");
++    const struct {
++        u64 start;
++        u64 end;
++        const char *name;
++    } loaded[] = {
++        {heap_start, heap_end, "payload heap"},
++        {initrd_begin, initrd_end, "initrd"},
++        {(u64)_base, (u64)_end, "m1n1"},
++    };
++
++    struct {
++        u64 start;
++        u64 end;
++    } ranges[16];
++    unsigned int count = 0;
++
++    for (unsigned int i = 0; i < length / sizeof(*segments); i++) {
++        const struct adt_segment_ranges *seg = &segments[i];
++        if (!seg->size || seg->phys + seg->size < seg->phys)
++            bail("ADT: Invalid MTP segment %u physical range\n", i);
++        u64 end = seg->phys + seg->size;
++        if (end <= dram_base || seg->phys >= dram_end)
++            continue; /* Local coprocessor SRAM is not Linux DRAM. */
++        if (seg->phys < dram_base || end > dram_end || end > ~(u64)0 - (SZ_16K - 1))
++            bail("ADT: MTP segment %u crosses DRAM boundary\n", i);
++        u64 start = ALIGN_DOWN(seg->phys, SZ_16K);
++        end = ALIGN_UP(end, SZ_16K);
++        if (start < dram_base || end > dram_end)
++            bail("ADT: MTP page-rounded segment %u crosses DRAM boundary\n", i);
++        for (unsigned int j = 0; j < ARRAY_SIZE(loaded); j++) {
++            if (loaded[j].start < loaded[j].end && start < loaded[j].end &&
++                loaded[j].start < end)
++                bail("FDT: MTP segment %u (0x%lx..0x%lx) overlaps %s (0x%lx..0x%lx); "
++                     "refusing Linux handoff\n", i, start, end, loaded[j].name,
++                     loaded[j].start, loaded[j].end);
++        }
++        ranges[count].start = start;
++        ranges[count++].end = end;
++    }
++
++    if (!count)
++        bail("ADT: MTP has no DRAM firmware segments to preserve\n");
++
++    /* Sort and coalesce page-rounded segments; adjacent raw segments may share
++     * a 16 KiB page and must not become overlapping reserved-memory resources.
++     */
++    for (unsigned int i = 1; i < count; i++) {
++        unsigned int j = i;
++        while (j && ranges[j - 1].start > ranges[j].start) {
++            u64 start = ranges[j - 1].start, end = ranges[j - 1].end;
++            ranges[j - 1] = ranges[j];
++            ranges[j].start = start;
++            ranges[j].end = end;
++            j--;
++        }
++    }
++    for (unsigned int i = 0; i < count; i++) {
++        u64 start = ranges[i].start, end = ranges[i].end;
++        while (i + 1 < count && ranges[i + 1].start <= end) {
++            i++;
++            end = max(end, ranges[i].end);
++        }
++        char name[64];
++        snprintf(name, sizeof(name), "mtp-firmware@%lx", start);
++        int node = dt_get_or_add_reserved_mem(name, "apple,asc-mem", true,
++                                               start, end - start);
++        if (node < 0)
++            return node;
++        u32 phandle = fdt_get_phandle(dt, node);
++        if (!phandle)
++            bail("FDT: Missing MTP reserved-memory phandle\n");
++        if (dt_device_add_mem_region("mtp", phandle, NULL))
++            return -1;
++        /* Deliberately no iommu-addresses: physical preservation is established,
++         * but no source yet establishes the corresponding DART-visible address.
++         */
++        printf("FDT: Preserved MTP DRAM 0x%lx..0x%lx (no DART mapping)\n", start, end);
++    }
++    return 0;
++}
++
++#ifdef VLINUX_RAM_BOOT
++static int dt_prepare_neo_mtp_dapf(void)
++{
++    if (fdt_node_check_compatible(dt, 0, "apple,t8140") != 0)
++        return 0;
++
++    int helper = fdt_node_offset_by_compatible(dt, -1, "apple,t8140-mtp");
++    if (helper < 0 || !fdt_getprop(dt, helper, "apple,mtp-preserve-firmware", NULL))
++        return 0;
++    if (fdt_path_offset(dt, "mtp") != helper)
++        bail("FDT: MTP DAPF setup requires the mtp alias\n");
++
++    int len;
++    const char *enabled = fdt_getprop(dt, helper, "status", &len);
++    if (enabled && !((len == 5 && !memcmp(enabled, "okay", 5)) ||
++                     (len == 3 && !memcmp(enabled, "ok", 3))))
++        return 0;
++
++    int chosen = fdt_path_offset(dt, "/chosen");
++    if (chosen < 0)
++        bail("FDT: Missing chosen node for MTP DAPF diagnostics\n");
++    if (fdt_getprop(dt, chosen, "vlinux,mtp-dapf-status", NULL))
++        bail("FDT: Refusing a preexisting MTP DAPF success claim\n");
++
++    /* Allocate the diagnostic property before touching MMIO. Its size stays
++     * fixed so recording verified readback needs no further FDT space.
++     */
++    char status[64] = "pending";
++    if (fdt_setprop(dt, chosen, "vlinux,mtp-dapf-status", status, sizeof(status)))
++        bail("FDT: Cannot reserve MTP DAPF diagnostic property\n");
++
++    int count = dapf_init_neo_mtp();
++    if (count <= 0)
++        bail("FDT: Neo MTP DAPF setup/readback failed; stopping handoff\n");
++    memset(status, 0, sizeof(status));
++    snprintf(status, sizeof(status), "verified entries=%d", count);
++    if (fdt_setprop(dt, chosen, "vlinux,mtp-dapf-status", status, sizeof(status)))
++        bail("FDT: Cannot record verified MTP DAPF setup\n");
++    return 0;
++}
++#endif
++
++#ifdef VLINUX_SSD_PROBE
++#include "neo_ssd_console.h"
++#ifdef VLINUX_SSD_IDENTIFY_PROBE
++#include "neo_ssd_identify.h"
++#ifdef VLINUX_SSD_FIRMWARE_PROBE
++#include "neo_ssd_firmware.h"
++#ifdef VLINUX_SSD_SERVICE_PROBE
++#include "neo_ssd_services.h"
++#ifdef VLINUX_SSD_BUFFER_PROBE
++#include "neo_ssd_buffers.h"
++_Static_assert(NEO_SSD_DMA_SIZE == NEO_SSD_BUFFER_POOL_SIZE, "SSD pool reservation size");
++#endif
++#endif
++#endif
++#endif
++static void neo_ssd_console_emit(const char *chunk)
++{
++    printf("%s", chunk);
++}
++
++static bool neo_ssd_read32_guarded(u64 address, u32 *value)
++{
++    /* Never nest guards or mask asynchronous abort delivery. One explicit LDR
++     * makes GUARD_MARK's destination-register recovery unambiguous.
++     */
++    if (exc_guard != GUARD_OFF || (mrs(DAIF) & BIT(8)))
++        return false;
++    exc_guard = GUARD_MARK | GUARD_SILENT;
++    int before = exc_count;
++    sysop("dsb sy");
++    sysop("isb");
++    if (exc_count != before) {
++        exc_guard = GUARD_OFF;
++        return false;
++    }
++    u32 data = read32(address);
++    sysop("dsb sy");
++    sysop("isb");
++    bool ok = exc_count == before;
++    exc_guard = GUARD_OFF;
++    if (ok)
++        *value = data;
++    return ok;
++}
++
++#ifdef VLINUX_SSD_POWER_PROBE
++static bool neo_ssd_write32_guarded(u64 address, u32 value)
++{
++    /* Independent closed write allowlist, even if the policy caller changes. */
++    if (address != 0x3007003a0 || value != 0xf || exc_guard != GUARD_OFF ||
++        (mrs(DAIF) & BIT(8)))
++        return false;
++    exc_guard = GUARD_SKIP | GUARD_SILENT;
++    int before = exc_count;
++    sysop("dsb sy");
++    sysop("isb");
++    if (exc_count != before) {
++        exc_guard = GUARD_OFF;
++        return false;
++    }
++    write32(address, value);
++    sysop("dsb sy");
++    sysop("isb");
++    bool ok = exc_count == before;
++    exc_guard = GUARD_OFF;
++    return ok;
++}
++
++static void neo_ssd_delay_us(unsigned int us)
++{
++    udelay(us);
++}
++#endif
++
++#ifdef VLINUX_SSD_IDENTIFY_PROBE
++static u64 neo_ssd_reserved_arena;
++
++#ifdef VLINUX_SSD_FIRMWARE_PROBE
++static bool neo_ssd_firmware_read64_guarded(u64 address, u64 *value)
++{
++    if (!neo_ssd_reserved_arena || !neo_ssd_firmware_read64_allowed(address) ||
++        exc_guard != GUARD_OFF || (mrs(DAIF) & BIT(8))) return false;
++    exc_guard = GUARD_MARK | GUARD_SILENT;
++    int before = exc_count;
++    sysop("dsb sy");
++    sysop("isb");
++    if (exc_count != before) {
++        exc_guard = GUARD_OFF;
++        return false;
++    }
++    u64 data = read64(address);
++    sysop("dsb sy");
++    sysop("isb");
++    bool ok = exc_count == before;
++    exc_guard = GUARD_OFF;
++    if (ok) *value = data;
++    return ok;
++}
++
++static bool neo_ssd_firmware_write64_guarded(u64 address, u64 value)
++{
++#ifdef VLINUX_SSD_BUFFER_PROBE
++    bool allowed = neo_ssd_buffers_write64_allowed(neo_ssd_reserved_arena, address, value);
++#elif defined(VLINUX_SSD_SERVICE_PROBE)
++    bool allowed = neo_ssd_services_write64_allowed(address, value);
++#else
++    bool allowed = neo_ssd_firmware_write64_allowed(address, value);
++#endif
++    if (!neo_ssd_reserved_arena || !allowed ||
++        exc_guard != GUARD_OFF || (mrs(DAIF) & BIT(8))) return false;
++    exc_guard = GUARD_SKIP | GUARD_SILENT;
++    int before = exc_count;
++    sysop("dsb sy");
++    sysop("isb");
++    if (exc_count != before) {
++        exc_guard = GUARD_OFF;
++        return false;
++    }
++    write64(address, value);
++    sysop("dsb sy");
++    sysop("isb");
++    bool ok = exc_count == before;
++    exc_guard = GUARD_OFF;
++    return ok;
++}
++
++#ifdef VLINUX_SSD_BUFFER_PROBE
++static bool neo_ssd_sart_write32_guarded(u64 address, u32 value)
++{
++    if (!neo_ssd_reserved_arena ||
++        !neo_ssd_buffers_sart_write_allowed(neo_ssd_reserved_arena, address, value) ||
++        exc_guard != GUARD_OFF || (mrs(DAIF) & BIT(8))) return false;
++    exc_guard = GUARD_SKIP | GUARD_SILENT;
++    int before = exc_count;
++    sysop("dsb sy");
++    sysop("isb");
++    if (exc_count != before) {
++        exc_guard = GUARD_OFF;
++        return false;
++    }
++    write32(address, value);
++    sysop("dsb sy");
++    sysop("isb");
++    bool ok = exc_count == before;
++    exc_guard = GUARD_OFF;
++    return ok;
++}
++
++static bool neo_ssd_buffer_prepare(u64 arena)
++{
++    if (!neo_ssd_reserved_arena || arena != neo_ssd_reserved_arena ||
++        exc_guard != GUARD_OFF || (mrs(DAIF) & BIT(8))) return false;
++    memset((void *)arena, 0, NEO_SSD_BUFFER_POOL_SIZE);
++    dc_cvac_range((void *)arena, NEO_SSD_BUFFER_POOL_SIZE);
++    sysop("dsb sy");
++    return true;
++}
++#endif
++
++static void neo_ssd_firmware_stage(unsigned int checkpoint)
++{
++    printf("SSD: Firmware checkpoint %u\n", checkpoint);
++    boot_checkpoint(checkpoint);
++}
++#else
++static bool neo_ssd_admin_write32_guarded(u64 address, u32 value)
++{
++    /* The arena is armed only after allocator consumption and FDT reservation.
++     * PMGR writes continue to use the separate, unchanged power-probe guard. */
++    if (!neo_ssd_reserved_arena ||
++        !neo_ssd_identify_write_allowed(neo_ssd_reserved_arena, address, value) ||
++        exc_guard != GUARD_OFF || (mrs(DAIF) & BIT(8))) return false;
++    exc_guard = GUARD_SKIP | GUARD_SILENT;
++    int before = exc_count;
++    sysop("dsb sy");
++    sysop("isb");
++    if (exc_count != before) {
++        exc_guard = GUARD_OFF;
++        return false;
++    }
++    write32(address, value);
++    sysop("dsb sy");
++    sysop("isb");
++    bool ok = exc_count == before;
++    exc_guard = GUARD_OFF;
++    return ok;
++}
++
++static void neo_ssd_dma_rmb(void) { dma_rmb(); }
++static void neo_ssd_dma_wmb(void) { dma_wmb(); }
++static void neo_ssd_admin_stage(unsigned int checkpoint)
++{
++    printf("SSD: Identify checkpoint %u\n", checkpoint);
++    boot_checkpoint(checkpoint);
++}
++#endif
++
++static int dt_neo_ssd_reserve_one(u64 start, u64 size, const char *prefix)
++{
++    int parent = fdt_path_offset(dt, "/reserved-memory");
++    char name[64];
++    snprintf(name, sizeof(name), "%s@%lx", prefix, start);
++    if (parent < 0 || fdt_subnode_offset(dt, parent, name) != -FDT_ERR_NOTFOUND)
++        bail("FDT: Missing reserved-memory or preexisting SSD reservation\n");
++    if (dt_get_or_add_reserved_mem(name, "vlinux,ans-diagnostic-memory", true, start, size) < 0)
++        bail("FDT: Cannot reserve SSD diagnostic memory\n");
++    return 0;
++}
++
++static int dt_identify_neo_ssd(char *report, size_t report_size)
++{
++    u64 heap = (u64)heapblock_alloc_aligned(0, 1);
++    if (heap > ~(u64)0 - NEO_SSD_DMA_ALIGN - NEO_SSD_DMA_SIZE ||
++        heap < cur_boot_args.top_of_kernel_data || (u64)_end < (u64)_base)
++        bail("SSD: Invalid heap bounds before DMA reservation\n");
++    u64 arena = ALIGN_UP(heap, NEO_SSD_DMA_ALIGN);
++    struct neo_ssd_memory memory = {
++        .usable_base = cur_boot_args.phys_base,
++        .usable_size = cur_boot_args.mem_size,
++        .arena = arena,
++        .loaded = {
++            {cur_boot_args.top_of_kernel_data, arena + NEO_SSD_DMA_SIZE - cur_boot_args.top_of_kernel_data},
++            {(u64)initrd_start, initrd_size},
++            {(u64)_base, (u64)_end - (u64)_base},
++        },
++    };
++    if (!neo_ssd_identify_memory(&memory, report, report_size, neo_ssd_read32_guarded))
++        return 0; /* No admin register writes or memory initialization occurred. */
++    /* Reject any existing Linux reservation that intersects the proposed arena.
++     * Do not silently take memory owned by another firmware component. */
++    int parent = fdt_path_offset(dt, "/reserved-memory");
++    if (parent < 0) bail("FDT: Missing reserved-memory for SSD\n");
++    int node;
++    fdt_for_each_subnode(node, dt, parent) {
++        int length = 0;
++        const fdt64_t *reg = fdt_getprop(dt, node, "reg", &length);
++        if (!reg) continue;
++        if (length <= 0 || length % 16) bail("FDT: Invalid existing reservation\n");
++        for (int i = 0; i < length / 8; i += 2) {
++            u64 start = fdt64_to_cpu(reg[i]), size = fdt64_to_cpu(reg[i+1]);
++            if (!size || start + size < start ||
++                (start < arena + NEO_SSD_DMA_SIZE && arena < start + size))
++                bail("FDT: Existing reservation overlaps SSD arena\n");
++        }
++    }
++    for (int i = 0; i < fdt_num_mem_rsv(dt); i++) {
++        u64 start, size;
++        if (fdt_get_mem_rsv(dt, i, &start, &size) || start + size < start ||
++            (start < arena + NEO_SSD_DMA_SIZE && arena < start + size))
++            bail("FDT: Existing memory reserve overlaps SSD arena\n");
++    }
++    for (unsigned int i = 0; i < memory.count; i++)
++        if (dt_neo_ssd_reserve_one(memory.keep[i].start, memory.keep[i].size, "vlinux-ans-keep"))
++            return -1;
++    if (dt_neo_ssd_reserve_one(arena, NEO_SSD_DMA_SIZE, "vlinux-ssd-dma") ||
++        fdt_add_mem_rsv(dt, arena, NEO_SSD_DMA_SIZE))
++        bail("FDT: Could not retain the private SSD arena\n");
++    void *cpu = heapblock_alloc_aligned(NEO_SSD_DMA_SIZE, NEO_SSD_DMA_ALIGN);
++    if ((u64)cpu != arena) bail("SSD: Allocator changed after memory planning\n");
++    printf("SSD: Firmware regions and private DMA arena reserved at 0x%lx\n", arena);
++#ifdef VLINUX_SSD_FIRMWARE_PROBE
++#ifdef VLINUX_SSD_BUFFER_PROBE
++    static const struct neo_ssd_buffer_ops ops = {
++        .mailbox = {neo_ssd_read32_guarded, neo_ssd_firmware_read64_guarded,
++                    neo_ssd_firmware_write64_guarded, neo_ssd_delay_us, neo_ssd_firmware_stage},
++        .write32 = neo_ssd_sart_write32_guarded,
++        .prepare = neo_ssd_buffer_prepare,
++    };
++    neo_ssd_reserved_arena = arena;
++    unsigned int checkpoint = neo_ssd_buffers_probe(arena, report, report_size, &ops);
++#else
++    static const struct neo_ssd_firmware_ops ops = {
++        neo_ssd_read32_guarded, neo_ssd_firmware_read64_guarded,
++        neo_ssd_firmware_write64_guarded, neo_ssd_delay_us, neo_ssd_firmware_stage,
++    };
++    neo_ssd_reserved_arena = arena;
++#ifdef VLINUX_SSD_SERVICE_PROBE
++    unsigned int checkpoint = neo_ssd_services_probe(report, report_size, &ops);
++#else
++    unsigned int checkpoint = neo_ssd_firmware_probe(report, report_size, &ops);
++#endif
++#endif
++    neo_ssd_reserved_arena = 0;
++    neo_ssd_console_report(report, report_size, true, neo_ssd_console_emit);
++    printf("SSD: Firmware probe hold at %u. Photograph screen; power off manually.\n", checkpoint);
++    /* Even a completed map is not a full RTKit boot. No admin writes or Linux
++     * handoff: retain all firmware memory while the negotiated IOP is active. */
++    while (true) sysop("wfe");
++#else
++    static const struct neo_ssd_admin_ops ops = {
++        neo_ssd_read32_guarded, neo_ssd_admin_write32_guarded, neo_ssd_delay_us,
++        neo_ssd_dma_rmb, neo_ssd_dma_wmb, neo_ssd_admin_stage,
++    };
++    neo_ssd_reserved_arena = arena;
++    enum neo_ssd_admin_result result = neo_ssd_identify(cpu, arena, report, report_size, &ops);
++    neo_ssd_reserved_arena = 0;
++    if (result == NEO_SSD_ADMIN_HOLD) {
++        neo_ssd_console_report(report, report_size, true, neo_ssd_console_emit);
++        printf("SSD: Holding at 62. Photograph this screen; power off manually.\n");
++        /* No Linux handoff or allocator reuse when DMA ownership is uncertain.
++         * WDTs are already disabled by the native-tested initialization path. */
++        while (true) sysop("wfe");
++    }
++#endif
++    return 0;
++}
++#endif
++
++static int dt_probe_neo_ssd(void)
++{
++    int chosen = fdt_path_offset(dt, "/chosen");
++    if (chosen < 0 || fdt_getprop(dt, chosen, "vlinux,ssd-probe", NULL))
++        bail("FDT: Missing chosen or preexisting SSD probe claim\n");
++#ifdef VLINUX_SSD_IDENTIFY_PROBE
++    static char report[NEO_SSD_IDENTIFY_REPORT_SIZE];
++#else
++    static char report[NEO_SSD_REPORT_SIZE];
++#endif
++    memset(report, 0, sizeof(report));
++    if (fdt_setprop(dt, chosen, "vlinux,ssd-probe", report, sizeof(report)))
++        bail("FDT: Cannot reserve SSD report before MMIO\n");
++    printf("SSD: Beginning bounded register probe\n");
++    boot_checkpoint(55);
++#ifdef VLINUX_SSD_IDENTIFY_PROBE
++    if (neo_ssd_probe_queues(report, sizeof(report), chip_id == T8140 &&
++                   fdt_node_check_compatible(dt, 0, "apple,j700") == 0,
++                   neo_ssd_read32_guarded, neo_ssd_write32_guarded, neo_ssd_delay_us)) {
++        if (dt_identify_neo_ssd(report, sizeof(report))) return -1;
++    }
++#elif defined(VLINUX_SSD_QUEUE_PROBE)
++    neo_ssd_probe_queues(report, sizeof(report), chip_id == T8140 &&
++                   fdt_node_check_compatible(dt, 0, "apple,j700") == 0,
++                   neo_ssd_read32_guarded, neo_ssd_write32_guarded, neo_ssd_delay_us);
++#elif defined(VLINUX_SSD_POWER_PROBE)
++    neo_ssd_probe_power(report, sizeof(report), chip_id == T8140 &&
++                   fdt_node_check_compatible(dt, 0, "apple,j700") == 0,
++                   neo_ssd_read32_guarded, neo_ssd_write32_guarded, neo_ssd_delay_us);
++#else
++    neo_ssd_probe(report, sizeof(report), chip_id == T8140 &&
++                   fdt_node_check_compatible(dt, 0, "apple,j700") == 0,
++                   neo_ssd_read32_guarded);
++#endif
++    boot_checkpoint(56);
++    neo_ssd_console_report(report, sizeof(report), false, neo_ssd_console_emit);
++    chosen = fdt_path_offset(dt, "/chosen"); /* Reservations may move node offsets. */
++    if (fdt_setprop(dt, chosen, "vlinux,ssd-probe", report, sizeof(report)))
++        bail("FDT: Cannot record SSD report\n");
++    return 0;
++}
++#endif
++
+ static int dt_set_dcp_firmware(const char *alias)
+ {
+     const char *path = fdt_get_alias(dt, alias);
+@@ -2794,7 +3315,9 @@ int kboot_prepare_dt(void *fdt)
+     }
+ 
+     /* Need to init ISP early to carve out heap */
++#ifndef VLINUX_RAM_BOOT
+     isp_init();
++#endif
+ 
+     dt_bufsize = fdt_totalsize(fdt);
+     assert(dt_bufsize);
+@@ -2811,6 +3334,7 @@ int kboot_prepare_dt(void *fdt)
+     if (fdt_add_mem_rsv(dt, (u64)_base, ((u64)_end) - ((u64)_base)))
+         bail("FDT: couldn't add reservation for m1n1\n");
+ 
++#ifndef VLINUX_RAM_BOOT
+     if (!cpu_features->apple_sysregs_unlocked) {
+         // On M4* / A18 Pro / M5*, there is a CTRR instance left enabled only
+         // on the secondary (non-boot) cores. Add a reserved-memory region to
+@@ -2824,6 +3348,8 @@ int kboot_prepare_dt(void *fdt)
+             bail("FDT: couldn't add reservation for M4+ SMP-RO CTRR area\n");
+     }
+ 
++#endif
++
+     /* setup console log buffer early to capture as much log as possible */
+     dt_setup_mtd_phram();
+ 
+@@ -2837,6 +3363,7 @@ int kboot_prepare_dt(void *fdt)
+         return -1;
+     if (dt_set_cpus())
+         return -1;
++#ifndef VLINUX_RAM_BOOT
+     if (dt_set_mac_addresses())
+         return -1;
+     if (dt_set_wifi())
+@@ -2882,6 +3409,8 @@ int kboot_prepare_dt(void *fdt)
+ #ifndef RELEASE
+     if (dt_transfer_virtios())
+         return 1;
++#endif
++
+ #endif
+ 
+     /*
+@@ -2899,6 +3428,16 @@ int kboot_prepare_dt(void *fdt)
+      * in one of the above devicetree prep functions, and we want an up-to-date value
+      * for the usable memory span to make it into the devicetree.
+      */
++    if (dt_reserve_mtp_dram())
++        return -1;
++#ifdef VLINUX_RAM_BOOT
++    if (dt_prepare_neo_mtp_dapf())
++        return -1;
++#endif
++#ifdef VLINUX_SSD_PROBE
++    if (dt_probe_neo_ssd())
++        return -1;
++#endif
+     if (dt_set_memory())
+         return -1;
+ 
+@@ -2916,6 +3455,7 @@ int kboot_prepare_dt(void *fdt)
+ 
+ int kboot_boot(void *kernel)
+ {
++#ifndef VLINUX_RAM_BOOT
+     mcc_enable_cache();
+     tunables_apply_static();
+     clk_init();
+@@ -2926,6 +3466,10 @@ int kboot_boot(void *kernel)
+ 
+     printf("Setting SMP mode to WFE...\n");
+     smp_set_wfe_mode(true);
++#else
++    printf("RAM boot: retaining firmware MCC/cache and device state.\n");
++#endif
++    boot_checkpoint(45);
+     printf("Preparing to boot kernel at %p with fdt at %p\n", kernel, dt);
+ 
+     next_stage.entry = kernel;
+diff --git a/src/main.c b/src/main.c
+index d4e828c543076419aa5bbc99aa7250c79df64500..523ba60c66539c3df5b0e808bc58299bee8f5c71 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -6,6 +6,7 @@
+ #include "../config.h"
+ 
+ #include "adt.h"
++#include "boot_trace.h"
+ #include "aic.h"
+ #include "cpufreq.h"
+ #include "display.h"
+@@ -126,6 +127,10 @@ void run_actions(void)
+     fb_set_active(true);
+ 
+     printf("No valid payload found\n");
++#ifdef VLINUX_RAM_BOOT
++    boot_checkpoint(49);
++    boot_trace_hold();
++#endif
+ 
+ #ifndef BRINGUP
+     if (!usb_up) {
+@@ -149,29 +154,50 @@ void m1n1_main(void)
+ 
+     firmware_init();
+ 
++    boot_checkpoint(9);
+     heapblock_init();
++    boot_checkpoint(10);
+ 
+ #ifndef BRINGUP
+     if (supports_gxf())
+         gxf_init();
++    boot_checkpoint(11);
+     mcc_init();
++    boot_checkpoint(12);
++#if defined(VLINUX_BOOT_TRACE) && !defined(VLINUX_MMU_TRACE)
++    boot_trace_hold(); // Preserve the original pre-MMU diagnostic.
++#endif
++    boot_checkpoint(13);
+     mmu_init();
++    boot_checkpoint(14);
++#if defined(VLINUX_BOOT_TRACE) && !defined(VLINUX_INIT_TRACE)
++    boot_trace_hold(); // Preserve the MMU-only diagnostic.
++#endif
++    boot_checkpoint(26);
+     aic_init();
+ #endif
++    boot_checkpoint(27);
+     wdt_disable();
+ #ifndef BRINGUP
++    boot_checkpoint(28);
+     pmgr_init();
++    boot_checkpoint(29);
+ #ifdef USE_DEBUG_USB
+     tps6598x_enable_debugusb();
+ #endif
+ #ifdef USE_FB
++    boot_checkpoint(30);
+     display_init();
+     // Kick DCP to sleep, so dodgy monitors which cause reconnect cycles don't cause us to lose the
+     // framebuffer.
++    boot_checkpoint(31);
+     display_shutdown(DCP_SLEEP_IF_EXTERNAL);
+     // On idevice we need to always clear, because otherwise it looks scuffed on white devices
++    boot_checkpoint(32);
+     fb_init(!is_mac);
++    boot_checkpoint(33);
+     fb_display_logo();
++    boot_checkpoint(34);
+ #ifdef FB_SILENT_MODE
+     fb_set_active(!cur_boot_args.video.display);
+ #else
+@@ -179,12 +205,19 @@ void m1n1_main(void)
+ #endif
+ #endif
+ 
++    boot_checkpoint(35);
+     cpufreq_fixup();
++    boot_checkpoint(36);
+     sep_init();
++    boot_checkpoint(37);
+ #endif
+ 
+     printf("Initialization complete.\n");
+ 
++    boot_checkpoint(40);
++#if defined(VLINUX_INIT_TRACE) && !defined(VLINUX_RAM_BOOT)
++    boot_trace_hold(); // Batch initialization complete; do not enter payload/proxy.
++#endif
+     run_actions();
+ 
+     if (!next_stage.entry) {
+@@ -193,6 +226,7 @@ void m1n1_main(void)
+ 
+     printf("Preparing to run next stage at %p...\n", next_stage.entry);
+ 
++    boot_checkpoint(46);
+     nvme_shutdown();
+     exception_shutdown();
+ #ifndef BRINGUP
+@@ -201,9 +235,13 @@ void m1n1_main(void)
+ #ifdef USE_FB
+     fb_shutdown(next_stage.restore_logo);
+ #endif
++    boot_checkpoint(47);
+     mmu_shutdown();
+ #endif
+ 
++#ifdef VLINUX_HANDOFF_TRACE
++    boot_checkpoint(48);
++#endif
+     printf("Vectoring to next stage...\n");
+ 
+     next_stage.entry(next_stage.args[0], next_stage.args[1], next_stage.args[2], next_stage.args[3],
+diff --git a/src/memory.c b/src/memory.c
+index d350e91ad0712e491c4e9fc53d5a8b735be81c2c..656135a2fbf721e3dc53e41dc4e51fa97ca1272f 100644
+--- a/src/memory.c
++++ b/src/memory.c
+@@ -2,6 +2,7 @@
+ 
+ #include "memory.h"
+ #include "adt.h"
++#include "boot_trace.h"
+ #include "assert.h"
+ #include "cpu_regs.h"
+ #include "fb.h"
+@@ -565,9 +566,13 @@ void mmu_init(void)
+         return;
+     }
+ 
++    mmu_checkpoint(20);
+     mmu_init_pagetables();
++    mmu_checkpoint(21);
+     mmu_add_default_mappings();
++    mmu_checkpoint(22);
+     mmu_configure();
++    mmu_checkpoint(23);
+     if (cpu_features->mmu_sprr)
+         mmu_init_sprr();
+ 
+@@ -581,7 +586,9 @@ void mmu_init(void)
+     sctlr |= SCTLR_I | SCTLR_C | SCTLR_M | SCTLR_SPAN;
+ 
+     printf("MMU: SCTLR_EL1: %lx -> %lx\n", mrs(SCTLR_EL1), sctlr);
++    mmu_checkpoint(24);
+     write_sctlr(sctlr);
++    mmu_checkpoint(25);
+     printf("MMU: running with MMU and caches enabled!\n");
+ }
+ 
+diff --git a/src/neo_ssd.c b/src/neo_ssd.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..7e7f5951bfce3068cb8fe21375159812a278fdd2
+--- /dev/null
++++ b/src/neo_ssd.c
+@@ -0,0 +1,398 @@
++/* SPDX-License-Identifier: MIT */
++
++#include <stdarg.h>
++#include <string.h>
++
++#include "adt.h"
++#include "neo_ssd.h"
++#include "utils.h"
++
++extern int vsnprintf(char *str, size_t size, const char *format, va_list args);
++
++struct report {
++    char *text;
++    size_t size, used;
++    bool (*read)(u64 address, u32 *value);
++    bool (*write)(u64 address, u32 value);
++    void (*delay)(unsigned int us);
++    unsigned int writes;
++};
++
++static bool line(struct report *r, const char *format, ...)
++{
++    va_list args;
++    va_start(args, format);
++    int n = vsnprintf(r->text + r->used, r->size - r->used, format, args);
++    va_end(args);
++    if (n < 0 || (size_t)n >= r->size - r->used)
++        return false;
++    r->used += n;
++    return true;
++}
++
++struct region {
++    const char *path;
++    int index;
++    u64 base, size;
++};
++
++/* Closed allowlist from J700's ADT. Every region must still match this boot.
++ * In particular, secure NVMe reg[9] is only 64 KiB on this machine.
++ */
++static const struct region regions[] = {
++    {"/arm-io/pmgr", 0, 0x300700000, 0xcc000},
++    {"/arm-io/ans", 0, 0x389600000, 0x88000},
++    {"/arm-io/ans", 3, 0x38dcc0000, 0x60000},
++    {"/arm-io/ans", 9, 0x3cdcc0000, 0x10000},
++    {"/arm-io/sart-ans", 0, 0x38dc50000, 0xc000},
++};
++
++static bool read_reg(struct report *r, unsigned int block, u32 offset,
++                     const char *name, u32 *value)
++{
++    if (block >= sizeof(regions) / sizeof(regions[0]))
++        return false;
++    const struct region *reg = &regions[block];
++    if ((offset & 3) || offset > reg->size - sizeof(u32)) {
++        line(r, "SKIP %s offset=0x%x outside reg[%d] size=0x%lx\n",
++             name, offset, reg->index, reg->size);
++        return false;
++    }
++    if (!r->read(reg->base + offset, value)) {
++        line(r, "FAULT %s address=0x%lx; all further MMIO skipped\n",
++             name, reg->base + offset);
++        return false;
++    }
++    return line(r, "%s @0x%lx =0x%08x\n", name, reg->base + offset, *value);
++}
++
++static bool u32prop(int node, const char *name, u32 expected)
++{
++    u32 value, length = 0;
++    const void *prop = adt_getprop(adt, node, name, &length);
++    if (!prop || length != sizeof(value))
++        return false;
++    memcpy(&value, prop, sizeof(value));
++    return value == expected;
++}
++
++/* Confirm the exact group/offset power records before reading them. Gate 0x134
++ * is virtual: its parent is APCIE_SYS_ST, whose parents include ANS and APCIE_ST.
++ * Virtual fabric records have no power status register of their own.
++ */
++static bool power_metadata(int pmgr)
++{
++    static const struct {
++        u16 id, parent0, parent1;
++        u8 flags;
++        u32 offset;
++        char name[16];
++    } expected[] = {
++        {0x134, 0x5e, 0, 0x10, 0, "APCIE_SYS_ST-V"},
++        {0x5e, 0x39, 0x4c, 1, 0x3a0, "APCIE_SYS_ST"},
++        {0x39, 0x2e, 0, 1, 0x278, "ANS"},
++        {0x4c, 0x39, 0, 1, 0x310, "APCIE_ST"},
++        {0x2e, 0x27, 0x1f, 0x19, 0x220, "AFISOCNI1"},
++        {0x27, 0x1d, 0x1f, 0x10, 0x1e8, "AFINS0"},
++        {0x1d, 0, 0, 0x19, 0x198, "AFIMCCNI0"},
++        {0x1f, 0, 0, 0x10, 0x1a8, "PIOGW"},
++    };
++    u32 len = 0, glen = 0;
++    const u8 *devices = adt_getprop(adt, pmgr, "devices", &len);
++    const u8 *groups = adt_getprop(adt, pmgr, "ps-groups", &glen);
++    /* These records use 16-bit IDs and group zero at reg[0]+0. */
++    static const u8 zero[12] = {0};
++    if (!devices || len < 96 || len % 48 || len > 48 * 1024 ||
++        devices[3] != devices[51] || !groups || glen < 12 || glen % 12 ||
++        memcmp(groups, zero, 12))
++        return false;
++    for (unsigned int i = 0; i < sizeof(expected) / sizeof(expected[0]); i++) {
++        unsigned int found = 0;
++        for (u32 j = 0; j < len; j += 48) {
++            const u8 *d = devices + j;
++            u16 id, parent[2];
++            u32 group_offset;
++            memcpy(&id, d + 26, sizeof(id));
++            if (id != expected[i].id)
++                continue;
++            memcpy(parent, d + 4, sizeof(parent));
++            memcpy(&group_offset, d + 16, sizeof(group_offset));
++            if (d[0] != expected[i].flags || parent[0] != expected[i].parent0 ||
++                parent[1] != expected[i].parent1 || group_offset != expected[i].offset ||
++                memcmp(d + 32, expected[i].name, 16))
++                return false;
++            found++;
++        }
++        if (found != 1)
++            return false;
++    }
++    return true;
++}
++
++#define POWER_CONTROL (BIT(31) | BIT(28) | BIT(11) | BIT(10))
++
++static bool manual_active(u32 value)
++{
++    return (value & (POWER_CONTROL | 0xff)) == 0xff;
++}
++
++static bool enable_observed_domain(struct report *r, const u32 states[3])
++{
++    /* Follow pmgr_set_mode's policy: clear AUTO_ENABLE and the historical
++     * WAS_CLKGATED/WAS_PWRGATED bits and request active. Restrict this to the
++     * exact child state observed in IMG_0824; never write a parent or reset.
++     */
++    if (!manual_active(states[0]) || !manual_active(states[1])) {
++        line(r, "SSD_POWER_SKIPPED parents not manually active; writes=0\n");
++        return false;
++    }
++    if (manual_active(states[2])) {
++        line(r, "SSD_POWER_ALREADY_ACTIVE writes=0\n");
++        return true;
++    }
++    if ((states[2] & ~(BIT(9) | BIT(8))) != (BIT(28) | 0xf)) {
++        line(r, "SSD_POWER_SKIPPED unrecognised child state=0x%08x; writes=0\n", states[2]);
++        return false;
++    }
++    line(r, "SSD_POWER_ENABLE APCIE_SYS_ST @0x3007003a0 =0x0000000f; no reset\n");
++    r->writes = 1;
++    if (!r->write(0x3007003a0, 0xf)) {
++        line(r, "FAULT PMGR write; state uncertain, all further MMIO skipped\n");
++        return false;
++    }
++    u32 value = 0;
++    /* Same nominal 10 ms budget as pmgr_set_mode. Each read can abort. */
++    for (unsigned int i = 0; i < 1000; i++) {
++        if (!r->read(0x3007003a0, &value)) {
++            line(r, "FAULT PMGR poll; all further MMIO skipped\n");
++            return false;
++        }
++        if ((value & (POWER_CONTROL | 0xf)) != 0xf) {
++            line(r, "SSD_POWER_STOP unexpected control=0x%08x; no storage reads\n", value);
++            return false;
++        }
++        if ((value & 0xf0) == 0xf0) {
++            line(r, "SSD_POWER_READY value=0x%08x polls=%u; pmgr-writes=1\n", value, i + 1);
++            return true;
++        }
++        r->delay(10);
++    }
++    line(r, "SSD_POWER_TIMEOUT value=0x%08x; no storage reads\n", value);
++    return false;
++}
++
++static bool queue_snapshot(struct report *r)
++{
++    u32 value;
++    /* IONVMeFamily's ANS2 start maps ADT reg[3] into the generic register
++     * accessor. ANS3CGv2 EnableLinearSQ uses 0x24908 when secure-reg-layout
++     * is absent. SPTM independently uses reg[3]+0x28000 for NVMMU state.
++     * These are configuration/status reads, never queue doorbell reads.
++     */
++    line(r, "SSD_QUEUE_LAYOUT_BEGIN configuration only; no queue setup or DMA\n");
++    static const struct { u32 offset; const char *name; } config[] = {
++        {0x24908, "LEGACY_LINEAR_SQ_CTRL"},
++        {0x28108, "NVMMU_ASQ_TCB_LO"}, {0x2810c, "NVMMU_ASQ_TCB_HI"},
++        {0x28110, "NVMMU_IOSQ_TCB_LO"}, {0x28114, "NVMMU_IOSQ_TCB_HI"},
++        {0x28120, "NVMMU_LEGACY_INVALIDATE_STATUS"},
++    };
++    for (unsigned int i = 0; i < sizeof(config) / sizeof(config[0]); i++)
++        if (!read_reg(r, 2, config[i].offset, config[i].name, &value))
++            return false;
++    static const struct { u32 offset; const char *name; } io[] = {
++        {0x1200, "IO_SQ_LO"}, {0x1204, "IO_SQ_HI"},
++        {0x1208, "IO_CQ_LO"}, {0x120c, "IO_CQ_HI"}, {0x1210, "MAX_PENDING"},
++    };
++    for (unsigned int block = 2; block <= 3; block++) {
++        line(r, "QUEUE_CONFIG_REG[%d]\n", regions[block].index);
++        for (unsigned int i = 0; i < sizeof(io) / sizeof(io[0]); i++)
++            if (!read_reg(r, block, io[i].offset, io[i].name, &value))
++                return false;
++    }
++    /* SPTM's invalidate check reads four tag-state nibbles per word here.
++     * Snapshot all 64 tags, without invalidating or changing any of them.
++     */
++    for (u32 i = 0; i < 16; i++)
++        if (!read_reg(r, 2, 0x28000 + 4 * i, "NVMMU_TAG_STATE", &value))
++            return false;
++    return line(r, "SSD_QUEUE_LAYOUT_COMPLETE extra-reads=32 commands=0 DMA=0\n");
++}
++
++static bool probe(char *report, size_t size, bool t8140,
++                   bool (*read32_guarded)(u64 address, u32 *value),
++                   bool (*write32_guarded)(u64 address, u32 value),
++                   void (*delay_us)(unsigned int us), bool power, bool queues)
++{
++    /* Reserve enough space before any access; never probe if logs can truncate. */
++    if (!report || !size)
++        return false;
++    memset(report, 0, size);
++    struct report r = {report, size, 0, read32_guarded, write32_guarded, delay_us, 0};
++    if (size < NEO_SSD_REPORT_SIZE || !read32_guarded || (power && (!write32_guarded || !delay_us))) {
++        line(&r, "SSD_PROBE_SKIPPED report buffer or read callback\n");
++        return false;
++    }
++    if (queues) {
++        line(&r, "VLINUX_SSD_QUEUE_PROBE_V3 queue layout; no storage commands/writes\n");
++        line(&r, "At most 1 PMGR enable; the domain stays on for this RAM session\n");
++    } else if (power) {
++        line(&r, "VLINUX_SSD_POWER_PROBE_V2 at most 1 PMGR write; no storage commands/writes\n");
++        line(&r, "If enabled, the domain stays manually on for this RAM session\n");
++    } else {
++        line(&r, "VLINUX_SSD_PROBE_V1 register snapshot; no commands or MMIO writes\n");
++    }
++    if (!t8140 || !adt_is_compatible(adt, 0, "J700AP")) {
++        line(&r, "SSD_PROBE_SKIPPED not t8140/J700AP\n");
++        return false;
++    }
++    int ans = adt_path_offset(adt, "/arm-io/ans");
++    int sart = adt_path_offset(adt, "/arm-io/sart-ans");
++    int pmgr = adt_path_offset(adt, "/arm-io/pmgr");
++    int chosen = adt_path_offset(adt, "/chosen");
++    if (ans < 0 || sart < 0 || pmgr < 0 || chosen < 0) {
++        line(&r, "SSD_PROBE_SKIPPED missing ADT nodes\n");
++        return false;
++    }
++    line(&r, "ADT secure-bar=%d secure-layout=%d iboot-sptm-security=%d linear-sq=%d\n",
++         !!adt_getprop(adt, ans, "nvme-secure-bar", NULL),
++         !!adt_getprop(adt, ans, "nvme-secure-reg-layout", NULL),
++         !!adt_getprop(adt, chosen, "nvme-iboot-sptm-security", NULL),
++         !!adt_getprop(adt, ans, "nvme-linear-sq", NULL));
++    if (power && (!adt_getprop(adt, ans, "nvme-secure-bar", NULL) ||
++                  adt_getprop(adt, ans, "nvme-secure-reg-layout", NULL) ||
++                  adt_getprop(adt, chosen, "nvme-iboot-sptm-security", NULL) ||
++                  !adt_getprop(adt, ans, "nvme-linear-sq", NULL))) {
++        line(&r, "SSD_PROBE_SKIPPED power test requires the observed fuOS security flags\n");
++        return false;
++    }
++    if (!adt_is_compatible(adt, ans, "iop,ascwrap-v6") ||
++        !adt_is_compatible(adt, sart, "sart,coastguard") ||
++        !u32prop(sart, "sart-version", 3) ||
++        !u32prop(ans, "clock-gates", 0x134) ||
++        !u32prop(ans, "power-gates", 0x134) || !power_metadata(pmgr)) {
++        line(&r, "SSD_PROBE_SKIPPED controller/power metadata mismatch\n");
++        return false;
++    }
++    for (unsigned int i = 0; i < sizeof(regions) / sizeof(regions[0]); i++) {
++        const struct region *reg = &regions[i];
++        u64 base = 0, length = 0;
++        int path[8];
++        if (adt_path_offset_trace(adt, reg->path, path) < 0 ||
++            adt_get_reg(adt, path, "reg", reg->index, &base, &length) < 0 ||
++            base != reg->base || length != reg->size) {
++            line(&r, "SSD_PROBE_SKIPPED %s reg[%d] base=0x%lx size=0x%lx\n",
++                 reg->path, reg->index, base, length);
++            return false;
++        }
++    }
++    line(&r, "ADT_MATCH ans3=0x38dcc0000/0x60000 ans9=0x3cdcc0000/0x10000 SARTv3\n");
++    u32 value, active = 1, states[3], cpu_control, snapshot[2][11];
++    const u32 power_offsets[] = {0x278, 0x310, 0x3a0};
++    const char *power_names[] = {"PMGR_ANS", "PMGR_APCIE_ST", "PMGR_APCIE_SYS_ST"};
++    for (unsigned int i = 0; i < 3; i++) {
++        if (!read_reg(&r, 0, power_offsets[i], power_names[i], &value))
++            return false;
++        states[i] = value;
++        /* Actual and target must both be active; refuse reset/disable/parent-off. */
++        if ((value & 0xff) != 0xff || (value & (BIT(31) | BIT(11) | BIT(10))))
++            active = 0;
++    }
++    if (power) {
++        if (!enable_observed_domain(&r, states))
++            return false;
++        /* Recheck all three gates after the transition, before device MMIO. */
++        for (unsigned int i = 0; i < 3; i++) {
++            if (!read_reg(&r, 0, power_offsets[i], power_names[i], &value))
++                return false;
++            if (!manual_active(value)) {
++                line(&r, "SSD_POWER_STOP gate changed; no storage reads\n");
++                return false;
++            }
++        }
++    } else if (!active) {
++        line(&r, "SSD_PROBE_SKIPPED power not active; no power-up attempted\n");
++        return false;
++    }
++    if (!read_reg(&r, 1, 0x44, "ASC_CPU_CONTROL", &value))
++        return false;
++    cpu_control = value;
++    /* Standard NVMe status/configuration only. No interrupt acknowledgements,
++     * queue doorbells or mailbox receive registers (reads can dequeue messages).
++     */
++    static const struct { u32 offset; const char *name; } nvme[] = {
++        {0, "CAP_LO"}, {4, "CAP_HI"}, {8, "VS"}, {0x14, "CC"}, {0x1c, "CSTS"},
++        {0x24, "AQA"}, {0x28, "ASQ_LO"}, {0x2c, "ASQ_HI"},
++        {0x30, "ACQ_LO"}, {0x34, "ACQ_HI"}, {0x1300, "BOOT_STATUS"},
++    };
++    for (unsigned int block = 2; block <= 3; block++) {
++        line(&r, "NVME_REG[%d]\n", regions[block].index);
++        for (unsigned int i = 0; i < sizeof(nvme) / sizeof(nvme[0]); i++) {
++            if (!read_reg(&r, block, nvme[i].offset, nvme[i].name, &value))
++                return false;
++            snapshot[block - 2][i] = value;
++        }
++    }
++    /* Existing M4 code adds this offset to reg[9]. Record the rejected span. */
++    read_reg(&r, 3, 0x24908, "M4_LINEAR_SQ", &value);
++    if (!read_reg(&r, 2, 0x28100, "NVMMU_NUM", &value) ||
++        !read_reg(&r, 2, 0x29120, "NVMMU_INVALIDATE_STATUS", &value))
++        return false;
++    line(&r, "SARTv3 config / physical-page / page-count (raw; no new mappings)\n");
++    for (u32 i = 0; i < 16; i++) {
++        u32 cfg, pa, pages;
++        /* Each read is independently guarded; keep one compact line per entry. */
++        if (!r.read(regions[4].base + 4 * i, &cfg) ||
++            !r.read(regions[4].base + 0x40 + 4 * i, &pa) ||
++            !r.read(regions[4].base + 0x80 + 4 * i, &pages)) {
++            line(&r, "FAULT SART entry=%u; all further MMIO skipped\n", i);
++            return false;
++        }
++        if (!line(&r, "SART[%02u] %08x %08x %08x\n", i, cfg, pa, pages))
++            return false;
++    }
++    if (queues) {
++        /* Require the photographed firmware/disabled-controller state before
++         * accessing the new offsets. Equal standard registers alone do not
++         * establish that the full windows alias each other.
++         */
++        bool ready = cpu_control == 0x10;
++        for (unsigned int bank = 0; bank < 2; bank++)
++            ready = ready && snapshot[bank][0] == 0xf0010040 &&
++                    snapshot[bank][1] == 0x20 && snapshot[bank][2] == 0x10100 &&
++                    snapshot[bank][3] == 0x00474000 && snapshot[bank][4] == 0 &&
++                    snapshot[bank][10] == 0xde71ce55;
++        if (!ready) {
++            line(&r, "SSD_QUEUE_LAYOUT_SKIPPED controller differs from the native disabled/firmware-ready snapshot\n");
++            return false;
++        }
++        if (!queue_snapshot(&r))
++            return false;
++    }
++    if (power)
++        line(&r, "SSD_PROBE_COMPLETE commands=0 storage-writes=0 pmgr-writes=%u; namespace pending\n", r.writes);
++    else
++        line(&r, "SSD_PROBE_COMPLETE commands=0 writes=0; namespace discovery still pending\n");
++    return true;
++}
++
++void neo_ssd_probe(char *report, size_t size, bool t8140,
++                   bool (*read32_guarded)(u64 address, u32 *value))
++{
++    probe(report, size, t8140, read32_guarded, NULL, NULL, false, false);
++}
++
++void neo_ssd_probe_power(char *report, size_t size, bool t8140,
++                         bool (*read32_guarded)(u64 address, u32 *value),
++                         bool (*write32_guarded)(u64 address, u32 value),
++                         void (*delay_us)(unsigned int us))
++{
++    probe(report, size, t8140, read32_guarded, write32_guarded, delay_us, true, false);
++}
++
++bool neo_ssd_probe_queues(char *report, size_t size, bool t8140,
++                          bool (*read32_guarded)(u64 address, u32 *value),
++                          bool (*write32_guarded)(u64 address, u32 value),
++                          void (*delay_us)(unsigned int us))
++{
++    return probe(report, size, t8140, read32_guarded, write32_guarded, delay_us, true, true);
++}
+diff --git a/src/neo_ssd.h b/src/neo_ssd.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..1c34012741510893a2c64024b1cd98e3f7889848
+--- /dev/null
++++ b/src/neo_ssd.h
+@@ -0,0 +1,32 @@
++/* SPDX-License-Identifier: MIT */
++#ifndef NEO_SSD_H
++#define NEO_SSD_H
++
++#include "types.h"
++
++#define NEO_SSD_REPORT_SIZE 8192
++
++/* The probe has no write callback, queue submission, power or reset operation.
++ * read32 must return false on a bus fault. No further reads follow a fault.
++ */
++void neo_ssd_probe(char *report, size_t size, bool t8140,
++                   bool (*read32_guarded)(u64 address, u32 *value));
++
++/* Opt-in follow-up for the photographed J700 state. May write only
++ * APCIE_SYS_ST's PMGR register once, with 0xf, to clear automatic gating.
++ * Both parents must already be manually active. No resets or storage writes.
++ */
++void neo_ssd_probe_power(char *report, size_t size, bool t8140,
++                         bool (*read32_guarded)(u64 address, u32 *value),
++                         bool (*write32_guarded)(u64 address, u32 value),
++                         void (*delay_us)(unsigned int us));
++
++/* Power probe plus bounded queue-configuration reads in the legacy window.
++ * Does not enable the controller, ring doorbells, map DMA or submit commands.
++ */
++bool neo_ssd_probe_queues(char *report, size_t size, bool t8140,
++                          bool (*read32_guarded)(u64 address, u32 *value),
++                          bool (*write32_guarded)(u64 address, u32 value),
++                          void (*delay_us)(unsigned int us));
++
++#endif
+diff --git a/src/neo_ssd_buffers.c b/src/neo_ssd_buffers.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..bb663cf718c1d38854cdf02433eafc5b21d18b5c
+--- /dev/null
++++ b/src/neo_ssd_buffers.c
+@@ -0,0 +1,310 @@
++/* SPDX-License-Identifier: MIT */
++/* Protocol: Asahi RTKit/SARTv3. First buffer request photographed in IMG_0839. */
++#include <stdarg.h>
++#include <string.h>
++#include "adt.h"
++#include "neo_ssd_buffers.h"
++#include "neo_ssd_services.h"
++#include "utils.h"
++
++extern int vsnprintf(char *, size_t, const char *, va_list);
++
++#define ASC  0x389600000ULL
++#define SART 0x38dc50000ULL
++#define TYPE(n) ((u64)(n) << 52)
++
++static const u8 endpoints[] = {1, 2, 3, 4, 8, 10};
++struct service { unsigned int rx; u64 first, requested, granted; };
++struct probe {
++    const struct neo_ssd_buffer_ops *ops;
++    char *text;
++    size_t size, used;
++    u64 arena, allocated;
++    unsigned int tx, rx, starts, grants, writes;
++    bool mapped;
++};
++
++static bool arena_valid(u64 arena)
++{
++    return !(arena & 0x3fff) && arena >= 0x10000000000ULL &&
++           arena <= 0x10200000000ULL - NEO_SSD_BUFFER_POOL_SIZE;
++}
++
++static bool grant_valid(u64 arena, u64 message)
++{
++    u64 address, bytes;
++    if ((message >> 56) == 1) {
++        address = (message & 0xfffffffffULL) << 12;
++        bytes = (message >> 36) & 0xfffff;
++    } else if ((message >> 52) == 1) {
++        address = message & 0xfffffffffffULL;
++        bytes = ((message >> 44) & 0xff) << 12;
++    } else {
++        return false;
++    }
++    return arena_valid(arena) && bytes && bytes <= NEO_SSD_BUFFER_LIMIT &&
++           !(address & 0x3fff) && address >= arena &&
++           address < arena + NEO_SSD_BUFFER_POOL_SIZE &&
++           bytes <= arena + NEO_SSD_BUFFER_POOL_SIZE - address;
++}
++
++bool neo_ssd_buffers_sart_write_allowed(u64 arena, u64 address, u32 value)
++{
++    if (!arena_valid(arena)) return false;
++    if (address == SART + 0x48) return value == (arena >> 12);
++    if (address == SART + 0x88) return value == (NEO_SSD_BUFFER_POOL_SIZE >> 12);
++    if (address == SART + 0x08) return value == 0xff;
++    return false;
++}
++
++bool neo_ssd_buffers_write64_allowed(u64 arena, u64 address, u64 value)
++{
++    if (neo_ssd_services_write64_allowed(address, value)) return true;
++    if (!arena_valid(arena)) return false;
++    if (address == ASC + 0x8808)
++        return value == 1 || value == 2 || value == 4 || value == 8;
++    if (address != ASC + 0x8800) return false;
++    /* Only documented system-service ACK forms. Never management AP power. */
++    return grant_valid(arena, value) || value == TYPE(8) || value == TYPE(12) ||
++           (value & ~0xffULL) == TYPE(5);
++}
++
++static void note(struct probe *p, const char *format, ...)
++{
++    va_list args;
++    va_start(args, format);
++    int n = vsnprintf(p->text + p->used, p->size - p->used, format, args);
++    va_end(args);
++    if (n > 0 && (size_t)n < p->size - p->used) p->used += n;
++}
++
++static bool rd32(struct probe *p, u64 address, u32 *value)
++{
++    if (p->ops->mailbox.read32(address, value)) return true;
++    note(p, "SSD_BUF_FAULT read32 @0x%lx; stop SSD MMIO\n", address);
++    return false;
++}
++
++static bool send(struct probe *p, u64 message, unsigned int ep)
++{
++    bool packet = (!ep && neo_ssd_services_write64_allowed(ASC + 0x8800, message)) ||
++        ((ep == 1 || ep == 2 || ep == 4) && (message >> 52) == 1 &&
++         grant_valid(p->arena, message) && p->mapped) ||
++        (ep == 8 && (message >> 56) == 1 && grant_valid(p->arena, message) && p->mapped) ||
++        (ep == 2 && (message & ~0xffULL) == TYPE(5) && p->mapped) ||
++        (ep == 4 && (message == TYPE(8) || message == TYPE(12)) && p->mapped);
++    if (!packet || p->tx > 62 ||
++        !neo_ssd_buffers_write64_allowed(p->arena, ASC + 0x8800, message) ||
++        !neo_ssd_buffers_write64_allowed(p->arena, ASC + 0x8808, ep)) {
++        note(p, "SSD_BUF_REFUSED transmit packet/limit ep=%u\n", ep);
++        return false;
++    }
++    for (unsigned int i = 0; i < 2000; i++) {
++        u32 control;
++        if (!rd32(p, ASC + 0x8110, &control)) return false;
++        if (!(control & (1U << 16))) {
++            p->tx++;
++            if (!p->ops->mailbox.write64(ASC + 0x8800, message)) {
++                note(p, "SSD_BUF_FAULT send word0 ep=%u; stop SSD MMIO\n", ep);
++                return false;
++            }
++            p->tx++;
++            if (!p->ops->mailbox.write64(ASC + 0x8808, ep)) {
++                note(p, "SSD_BUF_FAULT send word1 ep=%u; stop SSD MMIO\n", ep);
++                return false;
++            }
++            return true;
++        }
++        p->ops->mailbox.delay(100);
++    }
++    note(p, "SSD_BUF_TIMEOUT outbound FIFO ep=%u\n", ep);
++    return false;
++}
++
++static bool map_pool(struct probe *p)
++{
++    p->ops->mailbox.stage(72);
++    u32 before[16][3];
++    static const u32 offsets[] = {0, 0x40, 0x80};
++    for (unsigned int i = 0; i < 16; i++) {
++        for (unsigned int j = 0; j < 3; j++)
++            if (!rd32(p, SART + offsets[j] + 4 * i, &before[i][j])) return false;
++        u32 flags = before[i][0], page = before[i][1], pages = before[i][2];
++        if (!flags && !page && !pages) continue;
++        if (!i && flags == 0xea && page == 0x3082c8 && pages == 1) continue;
++        u64 start = (u64)page << 12, bytes = (u64)pages << 12;
++        if ((flags != 0xea && flags != 0xff) || !bytes || start < 0x10000000000ULL ||
++            start >= 0x10200000000ULL || bytes > 0x10200000000ULL - start ||
++            (start < p->arena + NEO_SSD_BUFFER_POOL_SIZE && p->arena < start + bytes)) {
++            note(p, "SSD_BUF_REFUSED inherited SART[%u] %x %x %x\n", i, flags, page, pages);
++            return false;
++        }
++    }
++    if (before[2][0] || before[2][1] || before[2][2]) {
++        note(p, "SSD_BUF_REFUSED SART[2] not completely empty\n");
++        return false;
++    }
++    if (!p->ops->prepare(p->arena)) {
++        note(p, "SSD_BUF_REFUSED pool zero/cache preparation failed\n");
++        return false;
++    }
++    const struct { u64 address; u32 value; } writes[] = {
++        {SART + 0x48, p->arena >> 12},
++        {SART + 0x88, NEO_SSD_BUFFER_POOL_SIZE >> 12},
++        {SART + 0x08, 0xff}, /* Enable only after address and size read back. */
++    };
++    for (unsigned int i = 0; i < ARRAY_SIZE(writes); i++) {
++        if (!neo_ssd_buffers_sart_write_allowed(p->arena, writes[i].address, writes[i].value))
++            return false;
++        p->writes++;
++        if (!p->ops->write32(writes[i].address, writes[i].value)) {
++            note(p, "SSD_BUF_FAULT SART write @0x%lx; stop SSD MMIO\n", writes[i].address);
++            return false;
++        }
++        u32 value;
++        if (!rd32(p, writes[i].address, &value)) return false;
++        if (value != writes[i].value) {
++            note(p, "SSD_BUF_REFUSED SART readback @0x%lx got=%x want=%x\n",
++                 writes[i].address, value, writes[i].value);
++            return false;
++        }
++    }
++    before[2][0] = 0xff;
++    before[2][1] = p->arena >> 12;
++    before[2][2] = NEO_SSD_BUFFER_POOL_SIZE >> 12;
++    for (unsigned int i = 0; i < 16; i++)
++        for (unsigned int j = 0; j < 3; j++) {
++            u32 value;
++            if (!rd32(p, SART + offsets[j] + 4 * i, &value)) return false;
++            if (value != before[i][j]) {
++                note(p, "SSD_BUF_REFUSED SART[%u] field=%u changed\n", i, j);
++                return false;
++            }
++        }
++    p->mapped = true;
++    note(p, "SSD_BUF_SART_OK slot=2 pool=0x%lx bytes=0x%x; inherited entries unchanged\n",
++         p->arena, NEO_SSD_BUFFER_POOL_SIZE);
++    p->ops->mailbox.stage(73);
++    return true;
++}
++
++unsigned int neo_ssd_buffers_probe(u64 arena, char *report, size_t size,
++                                   const struct neo_ssd_buffer_ops *ops)
++{
++    if (!report || size < 16384 || !ops || !ops->write32 || !ops->prepare ||
++        !ops->mailbox.read32 || !ops->mailbox.read64 || !ops->mailbox.write64 ||
++        !ops->mailbox.delay || !ops->mailbox.stage) return 78;
++    size_t used = strnlen(report, size);
++    if (used >= size || size - used < 6144) return 78;
++    struct probe p = {.ops = ops, .text = report, .size = size, .used = used, .arena = arena};
++    unsigned int checkpoint = 78, polls = 0, idle = 0;
++    u64 iop = 0;
++    bool iop_seen = false;
++    struct service svc[ARRAY_SIZE(endpoints)] = {0};
++    note(&p, "SSD_BUF_BEGIN private service buffers; no AP power or NVMe commands\n");
++    int sart = adt_path_offset(adt, "/arm-io/sart-ans");
++    int nub = adt_path_offset(adt, "/arm-io/ans/iop-ans-nub");
++    u32 version = 0;
++    u64 mask = 0;
++    if (!arena_valid(arena) || sart < 0 || nub < 0 ||
++        !adt_is_compatible(adt, sart, "sart,coastguard") ||
++        ADT_GETPROP(adt, sart, "sart-version", &version) < 0 || version != 3 ||
++        (adt_getprop(adt, nub, "asc-dram-mask", NULL) &&
++         (ADT_GETPROP(adt, nub, "asc-dram-mask", &mask) < 0 || mask))) {
++        note(&p, "SSD_BUF_REFUSED pool/SART/address-mask metadata\n");
++        goto hold;
++    }
++    struct neo_ssd_firmware_map map;
++    if (neo_ssd_firmware_discover(report, size, &ops->mailbox, &map) != 67) {
++        p.used = strnlen(report, size);
++        goto hold;
++    }
++    p.used = strnlen(report, size);
++    if (map.version != 12 || map.present != 3 || map.pages[0] != 0x51f || map.pages[1] != 3) {
++        note(&p, "SSD_BUF_REFUSED native protocol/map changed\n");
++        goto hold;
++    }
++    for (unsigned int i = 0; i < ARRAY_SIZE(endpoints); i++) {
++        if (!send(&p, TYPE(5) | ((u64)endpoints[i] << 32) | 2, 0)) goto hold;
++        p.starts++;
++    }
++    /* One request per buffer endpoint, 256 KiB each, 1 MiB total. No reuse. */
++    for (; polls < 50000 && p.rx < 32; polls++) {
++        u32 control;
++        if (!rd32(&p, ASC + 0x8114, &control)) goto hold;
++        if (control & (1U << 17)) {
++            ops->mailbox.delay(100);
++            if (++idle == 10000) break;
++            continue;
++        }
++        idle = 0;
++        u64 message, endpoint;
++        if (!ops->mailbox.read64(ASC + 0x8830, &message)) {
++            note(&p, "SSD_BUF_FAULT receive word0; stop SSD MMIO\n"); goto hold;
++        }
++        if (!ops->mailbox.read64(ASC + 0x8838, &endpoint)) {
++            note(&p, "SSD_BUF_FAULT receive word1; stop SSD MMIO\n"); goto hold;
++        }
++        p.rx++;
++        note(&p, "SSD_BUF_RX msg=%016lx endpoint=%016lx\n", message, endpoint);
++        unsigned int ep = (u32)endpoint;
++        if (p.rx == 1 && (ep != 1 || message != 0x0010800000000000ULL)) {
++            note(&p, "SSD_BUF_REFUSED first request differs from native 32 KiB crashlog\n");
++            goto hold;
++        }
++        if (!ep && (message >> 52) == 7) {
++            iop_seen = true; iop = message & 0xffff;
++            if (iop == 0x20 && p.grants) { checkpoint = 76; goto hold; }
++            continue;
++        }
++        unsigned int slot;
++        for (slot = 0; slot < ARRAY_SIZE(endpoints); slot++)
++            if (ep == endpoints[slot]) break;
++        if (slot == ARRAY_SIZE(endpoints)) {
++            note(&p, "SSD_BUF_REFUSED unexpected endpoint=%u\n", ep); goto hold;
++        }
++        struct service *s = &svc[slot];
++        if (!s->rx) s->first = message;
++        s->rx++;
++        bool request = ((ep == 1 || ep == 2 || ep == 4) && (message >> 52) == 1) ||
++                       (ep == 8 && (message >> 56) == 1);
++        if (request) {
++            u64 bytes = ep == 8 ? (message >> 36) & 0xfffff : ((message >> 44) & 0xff) << 12;
++            u64 address = ep == 8 ? (message & 0xfffffffffULL) << 12 : message & 0xfffffffffffULL;
++            s->requested = bytes;
++            if (s->granted || address || !bytes || bytes > NEO_SSD_BUFFER_LIMIT ||
++                ALIGN_UP(bytes, 0x4000) > NEO_SSD_BUFFER_POOL_SIZE - p.allocated) {
++                note(&p, "SSD_BUF_REFUSED request ep=%u bytes=%lx addr=%lx duplicate=%u\n",
++                     ep, bytes, address, !!s->granted); goto hold;
++            }
++            if (!p.mapped && !map_pool(&p)) goto hold;
++            u64 grant = arena + p.allocated;
++            u64 reply = ep == 8 ? (1ULL << 56) | (bytes << 36) | (grant >> 12) :
++                                 TYPE(1) | ((bytes >> 12) << 44) | grant;
++            if (!send(&p, reply, ep)) goto hold;
++            s->granted = grant;
++            p.allocated += ALIGN_UP(bytes, 0x4000);
++            p.grants++;
++            note(&p, "SSD_BUF_GRANTED ep=%u bytes=%lx address=%lx\n", ep, bytes, grant);
++            ops->mailbox.stage(74);
++        } else if (ep == 2 && (message & ~0xffULL) == TYPE(5) && s->granted) {
++            if (!send(&p, message, ep)) goto hold; /* ACK without reading log memory. */
++        } else if (ep == 4 && (message == TYPE(8) || message == TYPE(12)) && s->granted) {
++            if (!send(&p, message, ep)) goto hold;
++        } /* Retain all other metadata without dereferencing or replying. */
++    }
++    if (!p.grants) { note(&p, "SSD_BUF_TIMEOUT no buffer granted\n"); goto hold; }
++    checkpoint = 75;
++    note(&p, "SSD_BUF_CAPTURED end=%s; IOP ON unconfirmed\n",
++         p.rx == 32 ? "message-limit" : idle == 10000 ? "quiet" : "poll-limit");
++hold:
++    for (unsigned int i = 0; i < ARRAY_SIZE(endpoints); i++)
++        note(&p, "SSD_BUF ep=%u rx=%u bytes=%lx grant=%lx first=%016lx\n",
++             endpoints[i], svc[i].rx, svc[i].requested, svc[i].granted, svc[i].first);
++    note(&p, "SSD_BUF_IOP seen=%u state=%lx; AP power not requested\n", iop_seen, iop);
++    note(&p, "SSD_BUF_HOLD checkpoint=%u starts=%u tx=%u rx=%u mapped=%u grants=%u "
++             "SART-writes=%u; NVMe-commands=0; retain pool\n",
++         checkpoint, p.starts, p.tx, p.rx, p.mapped, p.grants, p.writes);
++    ops->mailbox.stage(checkpoint);
++    return checkpoint;
++}
+diff --git a/src/neo_ssd_buffers.h b/src/neo_ssd_buffers.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..3f5268e5d3d303f65a274aa6b4ebc4cc747348f9
+--- /dev/null
++++ b/src/neo_ssd_buffers.h
+@@ -0,0 +1,29 @@
++/* SPDX-License-Identifier: MIT */
++#ifndef NEO_SSD_BUFFERS_H
++#define NEO_SSD_BUFFERS_H
++
++#include "neo_ssd_firmware.h"
++
++#define NEO_SSD_BUFFER_POOL_SIZE 0x100000
++#define NEO_SSD_BUFFER_LIMIT     0x40000
++
++struct neo_ssd_buffer_ops {
++    struct neo_ssd_firmware_ops mailbox;
++    bool (*write32)(u64 address, u32 value);
++    /* Zero and clean the entire already-reserved pool before enabling SART. */
++    bool (*prepare)(u64 arena);
++};
++
++bool neo_ssd_buffers_sart_write_allowed(u64 arena, u64 address, u32 value);
++bool neo_ssd_buffers_write64_allowed(u64 arena, u64 address, u64 value);
++
++/* Caller must reserve/consume the full 1 MiB pool using the compiled memory
++ * planner. Maps only previously empty SARTv3 slot 2. Never releases that slot
++ * or memory, even after a partial write/fault. Returns 75 for a bounded partial
++ * capture, 76 for IOP ON observed, 78 for refusal/fault. ALWAYS hold; no AP power
++ * request, application endpoint, NVMe configuration/command or Linux handoff.
++ */
++unsigned int neo_ssd_buffers_probe(u64 arena, char *report, size_t size,
++                                   const struct neo_ssd_buffer_ops *ops);
++
++#endif
+diff --git a/src/neo_ssd_console.h b/src/neo_ssd_console.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..49196e5a770e704e3f999f070ad198f3f8a5f6d6
+--- /dev/null
++++ b/src/neo_ssd_console.h
+@@ -0,0 +1,40 @@
++/* SPDX-License-Identifier: MIT */
++#ifndef NEO_SSD_CONSOLE_H
++#define NEO_SSD_CONSOLE_H
++
++#include <string.h>
++#include "types.h"
++
++#define NEO_SSD_CONSOLE_CHUNK 240
++#define NEO_SSD_CONSOLE_TAIL  1024
++
++/* debug_printf can emit only 511 bytes per call. Send small terminated chunks
++ * through a literal "%s" sink; never use report contents as a format string.
++ * On a native hold, show the tail so the final failure stays on the display.
++ * This only reads the report in RAM, including for unterminated input.
++ */
++static inline void neo_ssd_console_report(const char *report, size_t capacity, bool tail,
++                                          void (*emit)(const char *))
++{
++    if (!report || !capacity || !emit)
++        return;
++    size_t end = strnlen(report, capacity), pos = 0;
++    if (tail && end > NEO_SSD_CONSOLE_TAIL) {
++        pos = end - NEO_SSD_CONSOLE_TAIL;
++        emit("SSD: Report tail (last 1024 bytes):\n");
++    }
++    while (pos < end) {
++        char chunk[NEO_SSD_CONSOLE_CHUNK + 1];
++        size_t n = end - pos;
++        if (n > NEO_SSD_CONSOLE_CHUNK)
++            n = NEO_SSD_CONSOLE_CHUNK;
++        memcpy(chunk, report + pos, n);
++        chunk[n] = 0;
++        emit(chunk);
++        pos += n;
++    }
++    if (end && report[end - 1] != '\n')
++        emit("\n");
++}
++
++#endif
+diff --git a/src/neo_ssd_firmware.c b/src/neo_ssd_firmware.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..d05471a23786ecbc80a6799eddbfe5d120150cdc
+--- /dev/null
++++ b/src/neo_ssd_firmware.c
+@@ -0,0 +1,251 @@
++/* SPDX-License-Identifier: MIT */
++/* Bounded RTKit management discovery, before any NVMe controller writes.
++ * Wire format: Asahi m1n1 src/asc.c and src/rtkit.c; deliberately stops before
++ * system endpoints (and their unobserved buffer requirements) are started.
++ */
++#include <stdarg.h>
++#include <string.h>
++#include "adt.h"
++#include "neo_ssd_firmware.h"
++#include "neo_ssd_identify.h"
++#include "utils.h"
++
++extern int vsnprintf(char *, size_t, const char *, va_list);
++
++#define ASC      0x389600000ULL
++#define TX_CTRL  (ASC + 0x8110)
++#define RX_CTRL  (ASC + 0x8114)
++#define TX0      (ASC + 0x8800)
++#define TX1      (ASC + 0x8808)
++#define RX0      (ASC + 0x8830)
++#define RX1      (ASC + 0x8838)
++#define FULL     (1U << 16)
++#define EMPTY    (1U << 17)
++#define TYPE(n)  ((u64)(n) << 52)
++#define LAST     (1ULL << 51)
++#define INIT     (TYPE(6) | 0x220)
++
++struct probe {
++    const struct neo_ssd_firmware_ops *ops;
++    char *text;
++    size_t size, used;
++    unsigned int tx, rx;
++};
++
++static void note(struct probe *p, const char *fmt, ...)
++{
++    va_list args;
++    va_start(args, fmt);
++    int n = vsnprintf(p->text + p->used, p->size - p->used, fmt, args);
++    va_end(args);
++    if (n > 0 && (size_t)n < p->size - p->used)
++        p->used += n;
++}
++
++bool neo_ssd_firmware_read64_allowed(u64 address)
++{
++    return address == RX0 || address == RX1;
++}
++
++bool neo_ssd_firmware_write64_allowed(u64 address, u64 value)
++{
++    if (address == TX1)
++        return value == 0; /* management endpoint only */
++    if (address != TX0)
++        return false;
++    if (value == INIT || value == (TYPE(2) | 0x000b000b) ||
++        value == (TYPE(2) | 0x000c000c))
++        return true;
++    for (u64 base = 0; base < 8; base++)
++        if (value == (TYPE(8) | (base << 32) | LAST) ||
++            value == (TYPE(8) | (base << 32) | 1))
++            return true;
++    return false;
++}
++
++static bool rd32(struct probe *p, u64 address, u32 *value)
++{
++    if (p->ops->read32(address, value))
++        return true;
++    note(p, "SSD_FW_FAULT read32 @0x%lx; stop MMIO\n", address);
++    return false;
++}
++
++static bool read_message(struct probe *p, u64 *message, u64 *endpoint)
++{
++    for (unsigned int i = 0; i < 10000; i++) {
++        u32 control;
++        if (!rd32(p, RX_CTRL, &control))
++            return false;
++        if (!(control & EMPTY)) {
++            if (!p->ops->read64(RX0, message)) {
++                note(p, "SSD_FW_FAULT receive word0 @0x%lx; stop MMIO\n", RX0);
++                return false;
++            }
++            if (!p->ops->read64(RX1, endpoint)) {
++                note(p, "SSD_FW_FAULT receive word1 @0x%lx; stop MMIO\n", RX1);
++                return false;
++            }
++            p->rx++;
++            note(p, "SSD_FW_RX msg=0x%016lx endpoint-word=0x%016lx\n", *message, *endpoint);
++            return true;
++        }
++        p->ops->delay(100);
++    }
++    note(p, "SSD_FW_TIMEOUT receive; polls=10000\n");
++    return false;
++}
++
++static bool send_message(struct probe *p, u64 message)
++{
++    if (!neo_ssd_firmware_write64_allowed(TX0, message))
++        return false;
++    for (unsigned int i = 0; i < 2000; i++) {
++        u32 control;
++        if (!rd32(p, TX_CTRL, &control))
++            return false;
++        if (!(control & FULL)) {
++            p->tx++;
++            if (!p->ops->write64(TX0, message)) {
++                note(p, "SSD_FW_FAULT send word0 @0x%lx msg=0x%lx; stop MMIO\n", TX0, message);
++                return false;
++            }
++            p->tx++;
++            if (!p->ops->write64(TX1, 0)) {
++                note(p, "SSD_FW_FAULT send word1 @0x%lx; stop MMIO\n", TX1);
++                return false;
++            }
++            return true;
++        }
++        p->ops->delay(100);
++    }
++    note(p, "SSD_FW_TIMEOUT send; polls=2000\n");
++    return false;
++}
++
++static bool compatible(int node, const char *expected)
++{
++    u32 size = 0;
++    const char *s = adt_getprop(adt, node, "compatible", &size);
++    return s && size == strlen(expected) + 1 && !memcmp(s, expected, size);
++}
++
++unsigned int neo_ssd_firmware_discover(char *report, size_t size,
++                                       const struct neo_ssd_firmware_ops *ops,
++                                       struct neo_ssd_firmware_map *map)
++{
++    if (map)
++        memset(map, 0, sizeof(*map));
++    if (!report || size < NEO_SSD_IDENTIFY_REPORT_SIZE || !ops || !ops->read32 ||
++        !ops->read64 || !ops->write64 || !ops->delay || !ops->stage)
++        return 68;
++    size_t used = strnlen(report, size);
++    if (used >= size || size - used < 4096)
++        return 68;
++    struct probe p = {ops, report, size, used, 0, 0};
++    u32 maps[8] = {0}, seen = 0;
++    unsigned int checkpoint = 68, version = 0;
++    note(&p, "SSD_FW_BEGIN RTKit INIT/HELLO/endpoint map only; admin-writes=0\n");
++    ops->stage(63);
++    int ans = adt_path_offset(adt, "/arm-io/ans");
++    int nub = adt_path_offset(adt, "/arm-io/ans/iop-ans-nub");
++    if (ans < 0 || nub < 0 || !compatible(ans, "iop,ascwrap-v6") ||
++        !compatible(nub, "iop-nub,rtbuddy-v2")) {
++        note(&p, "SSD_FW_REFUSED incompatible ASC/nub metadata\n");
++        goto hold;
++    }
++    note(&p, "SSD_FW_ADT quiesced=%u; running CPU does not prove RTKit power-on\n",
++         adt_getprop(adt, nub, "quiesced", NULL) != NULL);
++    const struct { u64 address; u32 value; } state[] = {
++        {ASC + 0x44, 0x10},
++        {0x38dcc0014, 0x00474000}, {0x38dcc001c, 0},
++        {0x3cdcc0014, 0x00474000}, {0x3cdcc001c, 0},
++    };
++    for (unsigned int i = 0; i < ARRAY_SIZE(state); i++) {
++        u32 value;
++        if (!rd32(&p, state[i].address, &value))
++            goto hold;
++        if (value != state[i].value) {
++            note(&p, "SSD_FW_REFUSED state @0x%lx =0x%x expected=0x%x\n",
++                 state[i].address, value, state[i].value);
++            goto hold;
++        }
++    }
++    u32 tx, rx;
++    if (!rd32(&p, TX_CTRL, &tx) || !rd32(&p, RX_CTRL, &rx))
++        goto hold;
++    note(&p, "SSD_FW_MAILBOX tx-control=0x%x rx-control=0x%x\n", tx, rx);
++    if ((tx & (FULL | EMPTY)) != EMPTY) {
++        note(&p, "SSD_FW_REFUSED preexisting outbound traffic\n");
++        goto hold;
++    }
++    if (rx & EMPTY) {
++        if (!send_message(&p, INIT))
++            goto hold;
++        note(&p, "SSD_FW_INIT_SENT state=0x220\n");
++    } else {
++        note(&p, "SSD_FW_PENDING receive existing message before sending INIT\n");
++    }
++    ops->stage(64);
++    u64 message, endpoint;
++    if (!read_message(&p, &message, &endpoint))
++        goto hold;
++    if ((u32)endpoint || ((message >> 52) & 0xff) != 1) {
++        note(&p, "SSD_FW_REFUSED expected HELLO on management endpoint\n");
++        goto hold;
++    }
++    u32 minver = message & 0xffff, maxver = (message >> 16) & 0xffff;
++    note(&p, "SSD_FW_HELLO min=%u max=%u\n", minver, maxver);
++    if (minver > maxver || minver > 12 || maxver < 11) {
++        note(&p, "SSD_FW_REFUSED unsupported protocol; supported=11..12\n");
++        goto hold;
++    }
++    version = maxver < 12 ? maxver : 12;
++    if (!send_message(&p, TYPE(2) | version | ((u64)version << 16)))
++        goto hold;
++    ops->stage(65);
++    for (unsigned int i = 0; i < 8; i++) {
++        if (!read_message(&p, &message, &endpoint))
++            goto hold;
++        u32 base = (message >> 32) & 7;
++        if ((u32)endpoint || ((message >> 52) & 0xff) != 8 || (seen & (1U << base))) {
++            note(&p, "SSD_FW_REFUSED expected unique endpoint-map page\n");
++            goto hold;
++        }
++        maps[base] = (u32)message;
++        seen |= 1U << base;
++        note(&p, "SSD_FW_EPMAP base=%u bitmap=0x%08x last=%u\n", base, maps[base],
++             !!(message & LAST));
++        if (!send_message(&p, TYPE(8) | ((u64)base << 32) | ((message & LAST) ? LAST : 1)))
++            goto hold;
++        if (message & LAST) {
++            checkpoint = 67;
++            break;
++        }
++    }
++    if (checkpoint != 67) {
++        note(&p, "SSD_FW_REFUSED endpoint-map limit=8\n");
++        goto hold;
++    }
++    note(&p, "SSD_FW_DISCOVERY_OK protocol=%u pages=0x%02x\n", version, seen);
++    for (unsigned int i = 0; i < 8; i++)
++        if (seen & (1U << i))
++            note(&p, "SSD_FW_ENDPOINTS base=%u bitmap=0x%08x\n", i, maps[i]);
++hold:
++    if (map && checkpoint == 67) {
++        map->version = version;
++        map->present = seen;
++        memcpy(map->pages, maps, sizeof(maps));
++    }
++    note(&p, "%s checkpoint=%u tx-word-attempts=%u rx-messages=%u; "
++             "system endpoints not started; admin-writes=0 NVMe-commands=0\n",
++         map ? "SSD_FW_DISCOVERY_END" : "SSD_FW_HOLD", checkpoint, p.tx, p.rx);
++    ops->stage(checkpoint);
++    return checkpoint;
++}
++
++unsigned int neo_ssd_firmware_probe(char *report, size_t size,
++                                    const struct neo_ssd_firmware_ops *ops)
++{
++    return neo_ssd_firmware_discover(report, size, ops, NULL);
++}
+diff --git a/src/neo_ssd_firmware.h b/src/neo_ssd_firmware.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..0b25fabeda8390316de5895f0df1fb4191ad99f0
+--- /dev/null
++++ b/src/neo_ssd_firmware.h
+@@ -0,0 +1,41 @@
++/* SPDX-License-Identifier: MIT */
++#ifndef NEO_SSD_FIRMWARE_H
++#define NEO_SSD_FIRMWARE_H
++
++#include "types.h"
++
++struct neo_ssd_firmware_ops {
++    bool (*read32)(u64 address, u32 *value);
++    bool (*read64)(u64 address, u64 *value);
++    bool (*write64)(u64 address, u64 value);
++    void (*delay)(unsigned int us);
++    void (*stage)(unsigned int checkpoint);
++};
++
++struct neo_ssd_firmware_map {
++    unsigned int version;
++    u32 present, pages[8];
++};
++
++bool neo_ssd_firmware_read64_allowed(u64 address);
++bool neo_ssd_firmware_write64_allowed(u64 address, u64 value);
++
++/* Caller must first verify the J700 board/queue state and reserve live ANS
++ * firmware memory using neo_ssd_identify_memory plus FDT/allocator ownership.
++ * Returns 67 for completed HELLO/endpoint discovery, 68 for a fault/refusal.
++ * BOTH results require a native hold: never hand off or reuse reserved memory.
++ * Only management messages are sent; no endpoint starts, buffer grants, SART
++ * writes, controller configuration, reset or NVMe commands.
++ */
++unsigned int neo_ssd_firmware_probe(char *report, size_t size,
++                                    const struct neo_ssd_firmware_ops *ops);
++
++/* Same exchange, with a map copied out only after complete negotiation.
++ * A caller may continue a separately bounded service probe after return 67.
++ * Failed discovery must hold immediately; never release firmware memory.
++ */
++unsigned int neo_ssd_firmware_discover(char *report, size_t size,
++                                       const struct neo_ssd_firmware_ops *ops,
++                                       struct neo_ssd_firmware_map *map);
++
++#endif
+diff --git a/src/neo_ssd_identify.c b/src/neo_ssd_identify.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..3783009d1d207e96bdb630945c5e6bf59a6a2135
+--- /dev/null
++++ b/src/neo_ssd_identify.c
+@@ -0,0 +1,446 @@
++/* SPDX-License-Identifier: MIT */
++/* One hard-coded Identify Controller command. No namespace I/O, RTKit, reset,
++ * SART changes, I/O queues, retries or recovery writes after a fault. */
++#include <stdarg.h>
++#include <string.h>
++
++#include "adt.h"
++#include "neo_ssd_identify.h"
++#include "utils.h"
++
++extern int vsnprintf(char *, size_t, const char *, va_list);
++
++#define LEGACY        0x38dcc0000ULL
++#define SECURE        0x3cdcc0000ULL
++#define SART          0x38dc50000ULL
++#define CC_ENABLED    0x00470001
++#define CC_SHUTDOWN   0x00474001
++#define CC_DISABLED   0x00474000
++#define SQ_OFFSET     0x4000
++#define CQ_OFFSET     0x8000
++#define ID_OFFSET     0xc000
++#define READY_POLLS   50000
++#define COMMAND_POLLS 10000
++
++struct output {
++    char *text;
++    size_t size, used;
++};
++static bool append(struct output *o, const char *format, ...)
++{
++    if (o->used >= o->size)
++        return false;
++    va_list args;
++    va_start(args, format);
++    int n = vsnprintf(o->text + o->used, o->size - o->used, format, args);
++    va_end(args);
++    if (n < 0 || (size_t)n >= o->size - o->used)
++        return false;
++    o->used += n;
++    return true;
++}
++
++static bool output_init(struct output *o, char *report, size_t size)
++{
++    if (!report || size < NEO_SSD_IDENTIFY_REPORT_SIZE)
++        return false;
++    size_t n = strnlen(report, size);
++    if (n >= size || size - n < 6144)
++        return false;
++    *o = (struct output){report, size, n};
++    return true;
++}
++
++static bool inside(u64 start, u64 size, u64 low, u64 high)
++{
++    return size && start >= low && start < high && size <= high - start;
++}
++
++static bool add_keep(struct neo_ssd_memory *m, u64 start, u64 size, u64 low, u64 high)
++{
++    if (!inside(start, size, low, high) || m->count == NEO_SSD_KEEP_MAX ||
++        start + size > ~(u64)0 - (NEO_SSD_DMA_ALIGN - 1))
++        return false;
++    u64 end = ALIGN_UP(start + size, NEO_SSD_DMA_ALIGN);
++    start = ALIGN_DOWN(start, NEO_SSD_DMA_ALIGN);
++    if (start < low || end > high)
++        return false;
++    for (unsigned int i = 0; i < 3; i++) {
++        struct neo_ssd_span *s = &m->loaded[i];
++        if (s->size && start < s->start + s->size && s->start < end)
++            return false;
++    }
++    if (start < m->arena + NEO_SSD_DMA_SIZE && m->arena < end)
++        return false;
++    m->keep[m->count++] = (struct neo_ssd_span){start, end - start};
++    return true;
++}
++
++bool neo_ssd_identify_memory(struct neo_ssd_memory *m, char *report, size_t size,
++                             bool (*read)(u64 address, u32 *value))
++{
++    struct output o;
++    if (!m || !read || !output_init(&o, report, size))
++        return false;
++    m->count = 0;
++    int chosen = adt_path_offset(adt, "/chosen");
++    int nub = adt_path_offset(adt, "/arm-io/ans/iop-ans-nub");
++    u64 low = 0, bytes = 0, region = 0, region_size = 0;
++    u32 preloaded = 0;
++    const char *reason = "ANS firmware metadata";
++    if (chosen < 0 || nub < 0 || ADT_GETPROP(adt, chosen, "dram-base", &low) < 0 ||
++        ADT_GETPROP(adt, chosen, "dram-size", &bytes) < 0 || low != 0x10000000000ULL ||
++        bytes != 0x200000000ULL || ADT_GETPROP(adt, nub, "pre-loaded", &preloaded) < 0 ||
++        preloaded != 1 || ADT_GETPROP(adt, nub, "region-base", &region) < 0 ||
++        ADT_GETPROP(adt, nub, "region-size", &region_size) < 0)
++        goto refuse;
++    u64 high = low + bytes;
++    append(&o, "SSD_MEMORY usable=0x%lx+0x%lx arena=0x%lx\n", m->usable_base, m->usable_size,
++           m->arena);
++    append(&o, "SSD_MEMORY ANS region=0x%lx+0x%lx pre-loaded=%u\n", region, region_size, preloaded);
++    reason = "usable RAM or private arena bounds";
++    if (!inside(m->usable_base, m->usable_size, low, high) ||
++        !inside(m->arena, NEO_SSD_DMA_SIZE, m->usable_base, m->usable_base + m->usable_size) ||
++        (m->arena & (NEO_SSD_DMA_ALIGN - 1)))
++        goto refuse;
++    for (unsigned int i = 0; i < 3; i++) {
++        struct neo_ssd_span *s = &m->loaded[i];
++        append(&o, "SSD_MEMORY loaded[%u]=0x%lx+0x%lx\n", i, s->start, s->size);
++        reason = "loaded payload bounds";
++        if (!inside(s->start, s->size, low, high))
++            goto refuse;
++    }
++    /* The proposed arena must be the fresh tail of the non-freeing heap. */
++    reason = "arena is not fresh heap memory";
++    if (m->loaded[0].start + m->loaded[0].size != m->arena + NEO_SSD_DMA_SIZE ||
++        m->loaded[0].start >= m->arena)
++        goto refuse;
++    for (unsigned int i = 1; i < 3; i++)
++        if (m->arena < m->loaded[i].start + m->loaded[i].size &&
++            m->loaded[i].start < m->arena + NEO_SSD_DMA_SIZE)
++            goto refuse;
++    u32 length = 0;
++    reason = "ANS segment-ranges format";
++    const struct adt_segment_ranges *segments = adt_getprop(adt, nub, "segment-ranges", &length);
++    if (!segments || !length || length % sizeof(*segments) || length / sizeof(*segments) > 16)
++        goto refuse;
++    for (unsigned int i = 0; i < length / sizeof(*segments); i++) {
++        reason = "ANS segment overlaps payload or has invalid physical bounds/remap";
++        if (segments[i].phys != segments[i].remap ||
++            !add_keep(m, segments[i].phys, segments[i].size, low, high)) {
++            append(&o, "SSD_MEMORY segment[%u] phys=0x%lx size=0x%x remap=0x%lx\n", i,
++                   segments[i].phys, segments[i].size, segments[i].remap);
++            goto refuse;
++        }
++    }
++    reason = "ANS region overlaps payload or has invalid bounds";
++    if (!add_keep(m, region, region_size, low, high))
++        goto refuse;
++    /* Preserve inherited firmware buffers as well. The only admitted non-DRAM
++     * SART mapping is the already-photographed 4 KiB PMGR page in entry zero. */
++    unsigned int dram_entries = 0;
++    for (u32 i = 0; i < 16; i++) {
++        u32 cfg, page, pages;
++        if (!read(SART + 4 * i, &cfg) || !read(SART + 0x40 + 4 * i, &page) ||
++            !read(SART + 0x80 + 4 * i, &pages)) {
++            append(&o, "SSD_IDENTIFY_MEMORY_FAULT SART[%u]; no further MMIO\n", i);
++            return false;
++        }
++        if (!cfg && !page && !pages)
++            continue;
++        if (i == 0 && cfg == 0xea && page == 0x3082c8 && pages == 1)
++            continue;
++        reason = "SART buffer overlaps payload or has unknown flags/bounds";
++        if ((cfg != 0xea && cfg != 0xff) ||
++            !add_keep(m, (u64)page << 12, (u64)pages << 12, low, high)) {
++            append(&o, "SSD_MEMORY SART[%u]=%08x %08x %08x\n", i, cfg, page, pages);
++            goto refuse;
++        }
++        dram_entries++;
++    }
++    reason = "missing inherited SART buffers";
++    if (dram_entries < 2)
++        goto refuse;
++    /* Merge overlapping/adjacent 16 KiB ranges into valid Linux reservations. */
++    for (unsigned int i = 1; i < m->count; i++)
++        for (unsigned int j = i; j && m->keep[j - 1].start > m->keep[j].start; j--) {
++            struct neo_ssd_span s = m->keep[j - 1];
++            m->keep[j - 1] = m->keep[j];
++            m->keep[j] = s;
++        }
++    unsigned int count = 0;
++    for (unsigned int i = 0; i < m->count; i++) {
++        struct neo_ssd_span s = m->keep[i];
++        if (count && s.start <= m->keep[count - 1].start + m->keep[count - 1].size) {
++            u64 end = s.start + s.size;
++            if (end > m->keep[count - 1].start + m->keep[count - 1].size)
++                m->keep[count - 1].size = end - m->keep[count - 1].start;
++        } else
++            m->keep[count++] = s;
++    }
++    m->count = count;
++    for (unsigned int i = 0; i < count; i++)
++        append(&o, "SSD_FW_KEEP 0x%lx..0x%lx\n", m->keep[i].start,
++               m->keep[i].start + m->keep[i].size);
++    append(&o, "SSD_DMA_PLANNED 0x%lx size=0x%x; require FDT reservation before writes\n", m->arena,
++           NEO_SSD_DMA_SIZE);
++    return true;
++refuse:
++    append(&o, "SSD_IDENTIFY_MEMORY_SKIPPED %s; no admin writes\n", reason);
++    m->count = 0;
++    return false;
++}
++
++bool neo_ssd_identify_write_allowed(u64 arena, u64 address, u32 value)
++{
++    if (!inside(arena, NEO_SSD_DMA_SIZE, 0x10000000000ULL, 0x10200000000ULL) ||
++        (arena & (NEO_SSD_DMA_ALIGN - 1)))
++        return false;
++    switch (address) {
++        case SECURE + 0x0c:
++            return value == 1; /* mask admin interrupt */
++        case SECURE + 0x14:
++            return value == CC_ENABLED || value == CC_SHUTDOWN || value == CC_DISABLED;
++        case SECURE + 0x24:
++            return value == 0x003f003f;
++        case SECURE + 0x28:
++            return value == (u32)(arena + SQ_OFFSET);
++        case SECURE + 0x2c:
++            return value == (u32)((arena + SQ_OFFSET) >> 32);
++        case SECURE + 0x30:
++            return value == (u32)(arena + CQ_OFFSET);
++        case SECURE + 0x34:
++            return value == (u32)((arena + CQ_OFFSET) >> 32);
++        case SECURE + 0x1210:
++            return value == 0x003f003f;
++        case LEGACY + 0x28108:
++            return value == (u32)arena;
++        case LEGACY + 0x2810c:
++            return value == (u32)(arena >> 32);
++        case LEGACY + 0x2490c:
++            return value == 0; /* submit tag zero only */
++        case LEGACY + 0x28118:
++            return value == 0; /* invalidate tag zero only */
++        case SECURE + 0x1004:
++            return value == 1; /* consume one completion */
++        default:
++            return false;
++    }
++}
++
++struct admin {
++    const struct neo_ssd_admin_ops *ops;
++    struct output out;
++    u64 arena;
++    unsigned int writes;
++};
++static bool rd(struct admin *a, u64 address, u32 *value)
++{
++    if (a->ops->read(address, value))
++        return true;
++    append(&a->out, "SSD_IDENTIFY_FAULT read @0x%lx; stop MMIO\n", address);
++    return false;
++}
++static bool wr(struct admin *a, u64 address, u32 value)
++{
++    if (!neo_ssd_identify_write_allowed(a->arena, address, value))
++        return false;
++    a->writes++;
++    if (a->ops->write(address, value))
++        return true;
++    append(&a->out, "SSD_IDENTIFY_FAULT write @0x%lx =0x%x; stop MMIO\n", address, value);
++    return false;
++}
++static bool expect(struct admin *a, u64 address, u32 mask, u32 expected)
++{
++    u32 value;
++    if (!rd(a, address, &value))
++        return false;
++    if ((value & mask) == expected)
++        return true;
++    append(&a->out, "SSD_IDENTIFY_MISMATCH @0x%lx =0x%08x expected=0x%08x mask=0x%08x\n", address,
++           value, expected, mask);
++    return false;
++}
++static bool set_check(struct admin *a, u64 address, u32 value, u32 mask)
++{
++    return wr(a, address, value) && expect(a, address, mask, value & mask);
++}
++static bool wait_status(struct admin *a, u32 mask, u32 wanted, const char *what)
++{
++    u32 value = 0;
++    for (unsigned int i = 0; i < READY_POLLS; i++) {
++        if (!rd(a, SECURE + 0x1c, &value))
++            return false;
++        if (value & BIT(1)) {
++            append(&a->out, "SSD_IDENTIFY_CFS %s CSTS=0x%x\n", what, value);
++            return false;
++        }
++        if ((value & mask) == wanted) {
++            append(&a->out, "SSD_ADMIN_%s CSTS=0x%x polls=%u\n", what, value, i + 1);
++            return true;
++        }
++        a->ops->delay(100);
++    }
++    append(&a->out, "SSD_IDENTIFY_TIMEOUT %s CSTS=0x%x\n", what, value);
++    return false;
++}
++static bool ascii_field(char *out, const u8 *in, unsigned int length)
++{
++    unsigned int n = length;
++    while (n && in[n - 1] == ' ')
++        n--;
++    if (!n)
++        return false;
++    for (unsigned int i = 0; i < n; i++) {
++        if (in[i] < 0x20 || in[i] > 0x7e)
++            return false;
++        out[i] = in[i];
++    }
++    out[n] = 0;
++    return true;
++}
++
++enum neo_ssd_admin_result neo_ssd_identify(void *cpu, u64 phys, char *report, size_t size,
++                                           const struct neo_ssd_admin_ops *ops)
++{
++    struct admin a = {.ops = ops, .arena = phys};
++    if (!cpu || !ops || !ops->read || !ops->write || !ops->delay || !ops->stage ||
++        !ops->dma_read_barrier || !ops->dma_write_barrier || ((u64)cpu & (NEO_SSD_DMA_ALIGN - 1)) ||
++        !output_init(&a.out, report, size) ||
++        !neo_ssd_identify_write_allowed(phys, SECURE + 0x24, 0x003f003f))
++        return NEO_SSD_ADMIN_SKIPPED;
++    /* Repeat all relevant disabled/empty state checks immediately before writes.
++     * Board/ADT/PMGR checks and memory reservations are mandatory caller gates. */
++    const u32 power_offsets[] = {0x278, 0x310, 0x3a0};
++    for (unsigned int i = 0; i < ARRAY_SIZE(power_offsets); i++)
++        if (!expect(&a, 0x300700000ULL + power_offsets[i],
++                    BIT(31) | BIT(28) | BIT(11) | BIT(10) | 0xff, 0xff))
++            goto skipped;
++    static const struct {
++        u64 address;
++        u32 value;
++    } preflight[] = {
++        {0x389600044, 0x10},           {SECURE, 0xf0010040},         {SECURE + 4, 0x20},
++        {SECURE + 8, 0x10100},         {SECURE + 0x14, CC_DISABLED}, {SECURE + 0x1c, 0},
++        {SECURE + 0x1300, 0xde71ce55}, {LEGACY + 0x14, CC_DISABLED}, {LEGACY + 0x1c, 0},
++        {LEGACY + 0x24908, 1},         {LEGACY + 0x28100, 63},       {LEGACY + 0x28108, 0},
++        {LEGACY + 0x2810c, 0},         {LEGACY + 0x28110, 0},        {LEGACY + 0x28114, 0},
++        {LEGACY + 0x28120, 0},         {LEGACY + 0x29120, 0},        {SECURE + 0x1200, 0},
++        {SECURE + 0x1204, 0},          {SECURE + 0x1208, 0},         {SECURE + 0x120c, 0},
++        {SECURE + 0x1210, 0},          {LEGACY + 0x1200, 0},         {LEGACY + 0x1204, 0},
++        {LEGACY + 0x1208, 0},          {LEGACY + 0x120c, 0},         {LEGACY + 0x1210, 0},
++    };
++    for (unsigned int i = 0; i < ARRAY_SIZE(preflight); i++)
++        if (!expect(&a, preflight[i].address, ~0U, preflight[i].value))
++            goto skipped;
++    for (u32 i = 0; i < 16; i++)
++        if (!expect(&a, LEGACY + 0x28000 + 4 * i, ~0U, 0))
++            goto skipped;
++
++    /* Each area gets a private 16 KiB page. Unused bytes are canaries. 64 TCBs
++     * match NVMMU_NUM=63; the only populated SQ slot is opcode 06/CNS 1/tag 0. */
++    u8 *bytes = cpu;
++    memset(bytes, 0xa5, NEO_SSD_DMA_SIZE);
++    memset(bytes, 0, 64 * 128);
++    memset(bytes + SQ_OFFSET, 0, 64 * 64);
++    memset(bytes + CQ_OFFSET, 0, 64 * 16);
++    memset(bytes + ID_OFFSET, 0, 4096);
++    bytes[1] = 1; /* TCB: FROM_DEVICE, opcode=0, slot=0, len=cdw12=0 */
++    u64 prp1 = phys + ID_OFFSET;
++    memcpy(bytes + 24, &prp1, 8);
++    bytes[SQ_OFFSET] = 6;
++    memcpy(bytes + SQ_OFFSET + 24, &prp1, 8);
++    bytes[SQ_OFFSET + 40] = 1; /* CNS Identify Controller, NSID=0 */
++    ops->dma_write_barrier();
++    append(&a.out, "SSD_IDENTIFY_BEGIN opcode=06 CNS=1 tag=0; namespace commands=0\n");
++    ops->stage(57);
++    if (!set_check(&a, SECURE + 0x0c, 1, 1) || !set_check(&a, LEGACY + 0x28108, (u32)phys, ~0U) ||
++        !set_check(&a, LEGACY + 0x2810c, phys >> 32, ~0U) ||
++        !set_check(&a, SECURE + 0x1210, 0x003f003f, ~0U) ||
++        !set_check(&a, SECURE + 0x28, (u32)(phys + SQ_OFFSET), ~0U) ||
++        !set_check(&a, SECURE + 0x2c, (phys + SQ_OFFSET) >> 32, ~0U) ||
++        !set_check(&a, SECURE + 0x30, (u32)(phys + CQ_OFFSET), ~0U) ||
++        !set_check(&a, SECURE + 0x34, (phys + CQ_OFFSET) >> 32, ~0U) ||
++        !set_check(&a, SECURE + 0x24, 0x003f003f, ~0U) ||
++        !set_check(&a, SECURE + 0x14, CC_ENABLED, ~0U) || !wait_status(&a, 0xf, 1, "READY"))
++        goto hold;
++    ops->stage(58);
++    ops->dma_write_barrier();
++    if (!wr(&a, LEGACY + 0x2490c, 0))
++        goto hold;
++    ops->stage(59);
++    u16 status = 0, tag;
++    volatile u16 *cq = (volatile u16 *)(bytes + CQ_OFFSET);
++    for (unsigned int i = 0; i < COMMAND_POLLS; i++) {
++        status = cq[7];
++        if (status & 1)
++            break;
++        ops->delay(100);
++    }
++    if (!(status & 1)) {
++        append(&a.out, "SSD_IDENTIFY_TIMEOUT completion; command submitted=1\n");
++        goto hold;
++    }
++    /* Completion phase is the producer's release; order payload/tag reads after it. */
++    ops->dma_read_barrier();
++    tag = cq[6];
++    append(&a.out, "SSD_IDENTIFY_CQE tag=%u status=0x%04x\n", tag, status);
++    if (tag != 0)
++        goto hold;
++    ops->stage(60);
++    if (!wr(&a, LEGACY + 0x28118, 0) || !expect(&a, LEGACY + 0x28120, ~0U, 0) ||
++        !expect(&a, LEGACY + 0x29120, ~0U, 0) || !expect(&a, LEGACY + 0x28000, 0xf, 0) ||
++        !wr(&a, SECURE + 0x1004, 1) || !set_check(&a, SECURE + 0x14, CC_SHUTDOWN, ~0U) ||
++        !wait_status(&a, 0xc, 8, "SHUTDOWN_DONE") ||
++        !set_check(&a, SECURE + 0x14, CC_DISABLED, ~0U) || !wait_status(&a, 1, 0, "DISABLED"))
++        goto hold;
++    ops->dma_read_barrier();
++    const struct {
++        u32 start, end;
++    } unused[] = {
++        {8192, SQ_OFFSET},
++        {SQ_OFFSET + 4096, CQ_OFFSET},
++        {CQ_OFFSET + 1024, ID_OFFSET},
++        {ID_OFFSET + 4096, NEO_SSD_DMA_SIZE},
++    };
++    for (unsigned int i = 0; i < ARRAY_SIZE(unused); i++)
++        for (u32 j = unused[i].start; j < unused[i].end; j++)
++            if (bytes[j] != 0xa5) {
++                append(&a.out, "SSD_IDENTIFY_DMA_CANARY_CHANGED offset=0x%x\n", j);
++                goto hold;
++            }
++    if ((status >> 1) == 0) {
++        const u8 *id = bytes + ID_OFFSET;
++        char model[41], firmware[9];
++        u16 vid;
++        u32 namespaces;
++        memcpy(&vid, id, 2);
++        memcpy(&namespaces, id + 516, 4);
++        if (vid && vid != 0xffff && namespaces && ascii_field(model, id + 24, 40) &&
++            ascii_field(firmware, id + 64, 8))
++            append(&a.out,
++                   "SSD_IDENTIFY_CONTROLLER_OK VID=0x%04x model=%s firmware=%s namespaces=%u\n",
++                   vid, model, firmware, namespaces);
++        else
++            append(&a.out,
++                   "SSD_IDENTIFY_DATA_INVALID completion succeeded; Identify fields implausible\n");
++    } else
++        append(&a.out, "SSD_IDENTIFY_COMMAND_ERROR status=0x%04x\n", status >> 1);
++    append(&a.out,
++           "SSD_IDENTIFY_STOPPED commands=1 namespace-reads=0 namespace-writes=0 admin-writes=%u; "
++           "DMA memory remains reserved\n",
++           a.writes);
++    ops->stage(61);
++    return NEO_SSD_ADMIN_STOPPED;
++skipped:
++    append(&a.out, "SSD_IDENTIFY_SKIPPED changed controller state; admin-writes=0\n");
++    return NEO_SSD_ADMIN_SKIPPED;
++hold:
++    append(&a.out,
++           "SSD_IDENTIFY_HOLD admin-writes=%u; photograph screen. No Linux handoff, retries or "
++           "further MMIO.\n",
++           a.writes);
++    ops->stage(62);
++    return NEO_SSD_ADMIN_HOLD;
++}
+diff --git a/src/neo_ssd_identify.h b/src/neo_ssd_identify.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..9a5c5066d667fe205fe8d521ced2287a662d7a6e
+--- /dev/null
++++ b/src/neo_ssd_identify.h
+@@ -0,0 +1,50 @@
++/* SPDX-License-Identifier: MIT */
++#ifndef NEO_SSD_IDENTIFY_H
++#define NEO_SSD_IDENTIFY_H
++
++#include "types.h"
++
++#define NEO_SSD_IDENTIFY_REPORT_SIZE 16384
++#ifdef VLINUX_SSD_BUFFER_PROBE
++#define NEO_SSD_DMA_SIZE             0x100000
++#else
++#define NEO_SSD_DMA_SIZE             0x10000
++#endif
++#define NEO_SSD_DMA_ALIGN            0x4000
++#define NEO_SSD_KEEP_MAX             35
++
++struct neo_ssd_span {
++    u64 start, size;
++};
++struct neo_ssd_memory {
++    u64 usable_base, usable_size, arena;
++    struct neo_ssd_span loaded[3]; /* heap including proposed arena, initrd, m1n1 */
++    struct neo_ssd_span keep[NEO_SSD_KEEP_MAX];
++    unsigned int count;
++};
++
++struct neo_ssd_admin_ops {
++    bool (*read)(u64 address, u32 *value);
++    bool (*write)(u64 address, u32 value);
++    void (*delay)(unsigned int us);
++    void (*dma_read_barrier)(void);
++    void (*dma_write_barrier)(void);
++    void (*stage)(unsigned int checkpoint);
++};
++
++enum neo_ssd_admin_result {
++    NEO_SSD_ADMIN_SKIPPED, /* No admin register writes. */
++    NEO_SSD_ADMIN_STOPPED, /* Completion consumed, shutdown done, RDY clear. */
++    NEO_SSD_ADMIN_HOLD,    /* Uncertain ownership: never hand off or free memory. */
++};
++
++/* Read-only planning. Caller must reserve every keep span and arena in the FDT
++ * and consume the arena in the non-freeing allocator BEFORE calling identify.
++ */
++bool neo_ssd_identify_memory(struct neo_ssd_memory *memory, char *report, size_t size,
++                             bool (*read)(u64 address, u32 *value));
++bool neo_ssd_identify_write_allowed(u64 arena, u64 address, u32 value);
++enum neo_ssd_admin_result neo_ssd_identify(void *arena_cpu, u64 arena_phys, char *report,
++                                           size_t size, const struct neo_ssd_admin_ops *ops);
++
++#endif
+diff --git a/src/neo_ssd_services.c b/src/neo_ssd_services.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..d850f73c4cdba41e728479103bc6d57eae0cdb21
+--- /dev/null
++++ b/src/neo_ssd_services.c
+@@ -0,0 +1,217 @@
++/* SPDX-License-Identifier: MIT */
++/* Observe system-service requirements before providing any shared buffers.
++ * Protocol fields: Asahi Linux drivers/soc/apple/rtkit.c. Endpoint set and
++ * protocol 12 were photographed on the Neo in IMG_0838 (build 6124477afb15955e).
++ */
++#include <stdarg.h>
++#include <string.h>
++#include "neo_ssd_services.h"
++#include "neo_ssd_identify.h"
++#include "utils.h"
++
++extern int vsnprintf(char *, size_t, const char *, va_list);
++
++#define ASC     0x389600000ULL
++#define TX_CTRL (ASC + 0x8110)
++#define RX_CTRL (ASC + 0x8114)
++#define TX0     (ASC + 0x8800)
++#define TX1     (ASC + 0x8808)
++#define RX0     (ASC + 0x8830)
++#define RX1     (ASC + 0x8838)
++#define TYPE(n) ((u64)(n) << 52)
++
++static const u8 endpoints[] = {1, 2, 3, 4, 8, 10};
++
++struct service {
++    unsigned int messages;
++    bool buffer;
++    u64 first, bytes, address;
++};
++
++struct probe {
++    char *text;
++    size_t size, used;
++    const struct neo_ssd_firmware_ops *ops;
++    unsigned int tx, starts, rx;
++};
++
++static void note(struct probe *p, const char *fmt, ...)
++{
++    va_list args;
++    va_start(args, fmt);
++    int n = vsnprintf(p->text + p->used, p->size - p->used, fmt, args);
++    va_end(args);
++    if (n > 0 && (size_t)n < p->size - p->used)
++        p->used += n;
++}
++
++bool neo_ssd_services_write64_allowed(u64 address, u64 value)
++{
++    if (neo_ssd_firmware_write64_allowed(address, value))
++        return true;
++    if (address != TX0)
++        return false;
++    for (unsigned int i = 0; i < ARRAY_SIZE(endpoints); i++)
++        if (value == (TYPE(5) | ((u64)endpoints[i] << 32) | 2))
++            return true;
++    return false;
++}
++
++static bool rd32(struct probe *p, u64 address, u32 *value)
++{
++    if (p->ops->read32(address, value))
++        return true;
++    note(p, "SSD_SVC_FAULT read32 @0x%lx; stop MMIO\n", address);
++    return false;
++}
++
++static bool start(struct probe *p, unsigned int endpoint)
++{
++    u64 message = TYPE(5) | ((u64)endpoint << 32) | 2;
++    if (!neo_ssd_services_write64_allowed(TX0, message))
++        return false;
++    for (unsigned int i = 0; i < 2000; i++) {
++        u32 control;
++        if (!rd32(p, TX_CTRL, &control))
++            return false;
++        if (!(control & (1U << 16))) {
++            p->tx++;
++            if (!p->ops->write64(TX0, message)) {
++                note(p, "SSD_SVC_FAULT send word0 ep=%u; stop MMIO\n", endpoint);
++                return false;
++            }
++            p->tx++;
++            if (!p->ops->write64(TX1, 0)) {
++                note(p, "SSD_SVC_FAULT send word1 ep=%u; stop MMIO\n", endpoint);
++                return false;
++            }
++            p->starts++;
++            note(p, "SSD_SVC_START_SENT ep=%u\n", endpoint);
++            return true;
++        }
++        p->ops->delay(100);
++    }
++    note(p, "SSD_SVC_TIMEOUT send ep=%u polls=2000\n", endpoint);
++    return false;
++}
++
++unsigned int neo_ssd_services_probe(char *report, size_t size,
++                                    const struct neo_ssd_firmware_ops *ops)
++{
++    struct neo_ssd_firmware_map map;
++    if (neo_ssd_firmware_discover(report, size, ops, &map) != 67)
++        return 68;
++    size_t used = strnlen(report, size);
++    if (used >= size) {
++        ops->stage(68);
++        return 68;
++    }
++    struct probe p = {report, size, used, ops, 0, 0, 0};
++    if (size - used < 4096) {
++        note(&p, "SSD_SVC_REFUSED insufficient report space; no service requests\n");
++        ops->stage(68);
++        return 68;
++    }
++    struct service services[ARRAY_SIZE(endpoints)] = {0};
++    unsigned int checkpoint = 68, polls = 0, idle = 0;
++    u64 iop_state = 0;
++    bool iop_seen = false;
++    note(&p, "SSD_SVC_BEGIN request six services; no buffer grants or AP power requests\n");
++    if (map.version != 12 || map.present != 3 || map.pages[0] != 0x51f || map.pages[1] != 3) {
++        note(&p, "SSD_SVC_REFUSED version/map differs from native 6124477afb15955e\n");
++        goto hold;
++    }
++    ops->stage(69);
++    for (unsigned int i = 0; i < ARRAY_SIZE(endpoints); i++)
++        if (!start(&p, endpoints[i]))
++            goto hold;
++    ops->stage(70);
++    /* No sends after this point. One second of quiet ends collection; the
++     * global limits also cover firmware that sends continuously or slowly.
++     */
++    for (; polls < 30000 && p.rx < 16; polls++) {
++        u32 control;
++        if (!rd32(&p, RX_CTRL, &control))
++            goto hold;
++        if (control & (1U << 17)) {
++            ops->delay(100);
++            if (++idle == 10000)
++                break;
++            continue;
++        }
++        idle = 0;
++        u64 message, endpoint;
++        if (!ops->read64(RX0, &message)) {
++            note(&p, "SSD_SVC_FAULT receive word0; stop MMIO\n");
++            goto hold;
++        }
++        if (!ops->read64(RX1, &endpoint)) {
++            note(&p, "SSD_SVC_FAULT receive word1; stop MMIO\n");
++            goto hold;
++        }
++        p.rx++;
++        note(&p, "SSD_SVC_RX msg=0x%016lx endpoint-word=0x%016lx\n", message, endpoint);
++        unsigned int ep = (u32)endpoint;
++        if (ep == 0 && ((message >> 52) & 0xff) == 7) {
++            iop_state = message & 0xffff;
++            iop_seen = true;
++            continue;
++        }
++        unsigned int slot;
++        for (slot = 0; slot < ARRAY_SIZE(endpoints); slot++)
++            if (ep == endpoints[slot])
++                break;
++        if (slot == ARRAY_SIZE(endpoints)) {
++            note(&p, "SSD_SVC_REFUSED unexpected management/application endpoint=%u\n", ep);
++            goto hold;
++        }
++        struct service *s = &services[slot];
++        if (!s->messages)
++            s->first = message;
++        s->messages++;
++        bool buffer = ((ep == 1 || ep == 2 || ep == 4) &&
++                       ((message >> 52) & 0xff) == 1) ||
++                      (ep == 8 && (message >> 56) == 1);
++        if (!buffer)
++            continue; /* retain raw metadata; no ACK or pointer interpretation */
++        if (s->buffer) {
++            note(&p, "SSD_SVC_REFUSED duplicate buffer/crash notification ep=%u\n", ep);
++            goto hold;
++        }
++        s->buffer = true;
++        if (ep == 8) {
++            s->bytes = (message >> 36) & 0xfffff;
++            s->address = (message & 0xfffffffffULL) << 12;
++        } else {
++            s->bytes = ((message >> 44) & 0xff) << 12;
++            s->address = message & 0xfffffffffffULL;
++        }
++        note(&p, "SSD_SVC_BUFFER ep=%u bytes=0x%lx address=0x%lx; no reply/grant\n",
++             ep, s->bytes, s->address);
++    }
++    if (!p.rx) {
++        note(&p, "SSD_SVC_TIMEOUT no replies after service requests\n");
++        goto hold;
++    }
++    checkpoint = 71;
++    note(&p, "SSD_SVC_CAPTURED end=%s; observed replies only, not service readiness\n",
++         p.rx == 16 ? "message-limit" : idle == 10000 ? "quiet" : "poll-limit");
++hold:
++    /* Repeat a compact inventory at the end so the console's 1024-byte tail
++     * contains all six services, even when the raw packet log is longer.
++     */
++    for (unsigned int i = 0; i < ARRAY_SIZE(endpoints); i++) {
++        struct service *s = &services[i];
++        if (s->buffer)
++            note(&p, "SSD_SVC ep=%u rx=%u buffer=0x%lx addr=0x%lx\n",
++                 endpoints[i], s->messages, s->bytes, s->address);
++        else
++            note(&p, "SSD_SVC ep=%u rx=%u first=0x%016lx\n",
++                 endpoints[i], s->messages, s->first);
++    }
++    note(&p, "SSD_SVC_IOP_POWER seen=%u state=0x%lx; AP power not requested\n", iop_seen, iop_state);
++    note(&p, "SSD_SVC_HOLD checkpoint=%u starts-sent=%u tx-words=%u rx=%u; "
++             "grants=0 SART-writes=0 NVMe-commands=0\n", checkpoint, p.starts, p.tx, p.rx);
++    ops->stage(checkpoint);
++    return checkpoint;
++}
+diff --git a/src/neo_ssd_services.h b/src/neo_ssd_services.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..7f9ee4fb1a16eae7bb33657530cc6356c79182cf
+--- /dev/null
++++ b/src/neo_ssd_services.h
+@@ -0,0 +1,19 @@
++/* SPDX-License-Identifier: MIT */
++#ifndef NEO_SSD_SERVICES_H
++#define NEO_SSD_SERVICES_H
++
++#include "neo_ssd_firmware.h"
++
++bool neo_ssd_services_write64_allowed(u64 address, u64 value);
++
++/* Requires the same board, live firmware-memory reservations and guarded
++ * callbacks as discovery. Request the six natively observed system endpoints,
++ * capture bounded replies, then ALWAYS hold. No buffer grants/ACKs, pointer
++ * dereferences, AP power requests, SART writes or NVMe commands.
++ * 71 means replies were captured, not that all services are operational.
++ * 68 means a refusal/fault. Neither result permits Linux handoff.
++ */
++unsigned int neo_ssd_services_probe(char *report, size_t size,
++                                    const struct neo_ssd_firmware_ops *ops);
++
++#endif
+diff --git a/src/payload.c b/src/payload.c
+index 5b1547fde0158a0aa02e66b7e07c72f3c1105b06..8457da5f610e5bd835d5da3d97b5506e9d8f4e85 100644
+--- a/src/payload.c
++++ b/src/payload.c
+@@ -4,6 +4,7 @@
+ #include "../build/build_tag.h"
+ 
+ #include "payload.h"
++#include "boot_trace.h"
+ #include "adt.h"
+ #include "assert.h"
+ #include "chainload.h"
+@@ -14,6 +15,8 @@
+ #include "mitigations.h"
+ #include "smp.h"
+ #include "utils.h"
++#include "xnuboot.h"
++#include "ram_boot.h"
+ 
+ #include "libfdt/libfdt.h"
+ #include "minilzlib/minlzma.h"
+@@ -288,6 +291,47 @@ bool payload_logo(void **custom_128, void **custom_256)
+     return false;
+ }
+ 
++#ifdef VLINUX_RAM_BOOT
++/* This experiment does not assume that t8140 uses an older MCC register layout.
++ * Only firmware's usable span is offered to Linux; cross-check live TZ metadata
++ * when present. Region IDs 2/4 are hints from older chips, not full MCC support. */
++static int ram_boot_check_memory(void)
++{
++    int chosen = adt_path_offset(adt, "/chosen");
++    u64 base = 0, size = 0;
++    if (chosen < 0 || ADT_GETPROP(adt, chosen, "dram-base", &base) < 0 ||
++        ADT_GETPROP(adt, chosen, "dram-size", &size) < 0 || !size || base + size < base)
++        return -1;
++    u64 low = cur_boot_args.phys_base, len = cur_boot_args.mem_size;
++    u64 high = low + len;
++    if (!ram_boot_span_valid(base, size, low, len, cur_boot_args.top_of_kernel_data))
++        return -1;
++    int map = adt_path_offset(adt, "/chosen/carveout-memory-map");
++    const char *names[] = {"region-id-2", "region-id-4"};
++    for (unsigned i = 0; i < 2; i++) {
++        u32 length = 0;
++        const void *prop = map < 0 ? NULL : adt_getprop(adt, map, names[i], &length);
++        if (!prop) {
++            printf("RAM boot: %s absent; using firmware usable span.\n", names[i]);
++            continue;
++        }
++        u64 region[2];
++        if (length != sizeof(region))
++            return -1;
++        memcpy(region, prop, sizeof(region));
++        u64 end = region[0] + region[1];
++        if (!ram_boot_range_disjoint(low, high, region[0], region[1])) {
++            printf("RAM boot: %s overlaps usable RAM; refusing handoff.\n", names[i]);
++            return -1;
++        }
++        printf("RAM boot: %s 0x%lx..0x%lx outside usable RAM.\n", names[i], region[0], end);
++    }
++    heapblock_set_limit((void *)high);
++    printf("RAM boot: firmware usable span 0x%lx..0x%lx. MCC remains unsupported.\n", low, high);
++    return 0;
++}
++#endif
++
+ int payload_run(void)
+ {
+     const char *target = adt_getprop(adt, 0, "target-type", NULL);
+@@ -304,6 +348,13 @@ int payload_run(void)
+         return -1;
+     }
+ 
++#ifdef VLINUX_RAM_BOOT
++    if (ram_boot_check_memory()) {
++        printf("RAM boot: invalid/unsafe live firmware memory map.\n");
++        return -1;
++    }
++#endif
++    boot_checkpoint(41);
+     void *p = _payload_start;
+ 
+     while (p)
+@@ -314,8 +365,13 @@ int payload_run(void)
+     }
+ 
+     if (kernel && fdt) {
++        boot_checkpoint(42);
++#ifndef VLINUX_RAM_BOOT
+         cpufreq_init();
+         smp_start_secondaries();
++#else
++        printf("RAM boot: firmware clocks, boot CPU only.\n");
++#endif
+         mitigations_perform();
+         if (enable_tso) {
+ 
+@@ -342,11 +398,13 @@ int payload_run(void)
+                 printf("Failed to kboot set %s='%s'\n", chosen[i], val);
+         }
+ 
++        boot_checkpoint(43);
+         if (kboot_prepare_dt(fdt)) {
+             printf("Failed to prepare FDT!\n");
+             return -1;
+         }
+ 
++        boot_checkpoint(44);
+         return kboot_boot(kernel);
+     } else if (kernel && !fdt) {
+         printf("ERROR: Kernel found but no devicetree for %s available.\n", expect_compatible);
+diff --git a/src/ram_boot.h b/src/ram_boot.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..adf8e9f13443400c1565f89256a1e6ac0607ac10
+--- /dev/null
++++ b/src/ram_boot.h
+@@ -0,0 +1,18 @@
++/* SPDX-License-Identifier: MIT */
++#ifndef VLINUX_RAM_BOOT_H
++#define VLINUX_RAM_BOOT_H
++#include "types.h"
++
++static inline bool ram_boot_span_valid(u64 base, u64 size, u64 low, u64 len, u64 top)
++{
++    u64 high = low + len;
++    return size && base + size >= base && len && high >= low && low >= base &&
++           high <= base + size && top >= low && top < high;
++}
++
++static inline bool ram_boot_range_disjoint(u64 low, u64 high, u64 base, u64 size)
++{
++    u64 end = base + size;
++    return end >= base && (!size || base >= high || end <= low);
++}
++#endif
+diff --git a/src/start.S b/src/start.S
+index aa11e18bad7f6db4d58cb4dc67e67b1238a40313..ea0c7232633611b6ce4e72666e17ab0247ef1a6a 100644
+--- a/src/start.S
++++ b/src/start.S
+@@ -1,6 +1,7 @@
+ /* SPDX-License-Identifier: MIT */
+ 
+ #include "soc.h"
++#include "../build/build_cfg.h"
+ 
+ #define UTRSTAT 0x010
+ #define UTXH 0x020
+@@ -210,6 +211,12 @@ debug_putc:
+ .globl reboot
+ .type reboot, @function
+ reboot:
++#ifdef VLINUX_HANDOFF_TRACE
++    // Also preserve failures too early to use the C console/hold helper.
++0:
++    wfe
++    b 0b
++#else
+     mrs x8, id_aa64pfr0_el1
+     tst w8, 0xf00
+     beq 1f
+@@ -220,5 +227,6 @@ reboot:
+ 1:
+     bl wdt_reboot
+     b .
++#endif
+ 
+ .pool
+diff --git a/src/startup.c b/src/startup.c
+index 61afe169c10ae68544227c541d1a3647a159ecc2..b3f6071d512025df777d5079c779c2becaa3c878 100644
+--- a/src/startup.c
++++ b/src/startup.c
+@@ -1,6 +1,8 @@
+ /* SPDX-License-Identifier: MIT */
+ 
++#include "../build/build_cfg.h"
+ #include "adt.h"
++#include "boot_trace.h"
+ #include "chickens.h"
+ #include "dockchannel_uart.h"
+ #include "exception.h"
+@@ -12,6 +14,74 @@
+ #include "utils.h"
+ #include "xnuboot.h"
+ 
++#if defined(VLINUX_ENTRY_PROBE) || defined(VLINUX_BOOT_TRACE)
++#include "entry_probe.h"
++#include "memory.h"
++
++/* Use the firmware-supplied framebuffer; its address must remain identity mapped. */
++static bool paint_checkpoint(unsigned int stage)
++{
++    int chosen = adt_path_offset(adt, "/chosen");
++    u32 probe_chip = 0;
++    u64 dram_base = 0, dram_size = 0;
++    if (cur_boot_args.revision >= 1 && cur_boot_args.revision <= 3 && chosen >= 0 &&
++        ADT_GETPROP(adt, chosen, "chip-id", &probe_chip) == sizeof(probe_chip) &&
++        probe_chip == T8140 &&
++        ADT_GETPROP(adt, chosen, "dram-base", &dram_base) == sizeof(dram_base) &&
++        ADT_GETPROP(adt, chosen, "dram-size", &dram_size) == sizeof(dram_size) &&
++        entry_probe_paint_stage(&cur_boot_args.video, dram_base, dram_size, stage)) {
++        for (u32 y = 0; y < ENTRY_PROBE_HEIGHT; y++) {
++            u64 row = cur_boot_args.video.base + (ENTRY_PROBE_Y + y) *
++                cur_boot_args.video.stride + ENTRY_PROBE_X * 4;
++            u64 start = ALIGN_DOWN(row, 64);
++            dc_cvac_range((void *)start, ALIGN_UP(row + ENTRY_PROBE_WIDTH * 4, 64) - start);
++        }
++        sysop("dsb sy");
++        return true;
++    }
++    return false;
++}
++
++static __attribute__((noreturn)) void checkpoint_hold(void)
++{
++    for (;;)
++        sysop("wfe");
++}
++#ifdef VLINUX_ENTRY_PROBE
++static __attribute__((noreturn)) void entry_probe(void)
++{
++    paint_checkpoint(0);
++    checkpoint_hold();
++}
++#else
++static unsigned int last_checkpoint;
++#ifdef VLINUX_INIT_TRACE
++void boot_trace_refresh(void)
++{
++    if (last_checkpoint)
++        paint_checkpoint(last_checkpoint);
++}
++#endif
++void boot_checkpoint(unsigned int stage)
++{
++    last_checkpoint = stage;
++    /* If the diagnostic loses its valid framebuffer, do not advance blindly. */
++    if (!paint_checkpoint(stage))
++        checkpoint_hold();
++#ifdef VLINUX_HANDOFF_TRACE
++    /* Give scanout/cameras time to catch entry and the Linux handoff phases.
++     * Refreshes from fb_update must not delay or recursively enter this path. */
++    if (stage == 1 || (stage >= 40 && stage <= 48))
++        udelay(2000000);
++#endif
++}
++void boot_trace_hold(void)
++{
++    checkpoint_hold();
++}
++#endif
++#endif
++
+ u64 boot_args_addr;
+ struct boot_args cur_boot_args;
+ void *adt;
+@@ -152,7 +222,18 @@ void dump_boot_args(struct boot_args *ba)
+             else
+                 mem_size_actual = 0x40000000;
+         } else {
+-            mem_size_actual = ALIGN_UP(ba->phys_base + ba->mem_size - 0x800000000, BIT(30));
++            u64 dram_base = 0x800000000;
++            u64 adt_base = 0;
++            int chosen = adt_path_offset(adt, "/chosen");
++            if (chosen >= 0 &&
++                ADT_GETPROP(adt, chosen, "dram-base", &adt_base) == sizeof(adt_base)) {
++                dram_base = adt_base;
++            } else if (chip_id == T8140) {
++                panic("Missing t8140 DRAM base; refusing a guessed memory mapping\n");
++            }
++            if (!boot_mem_size_from_range(dram_base, ba->phys_base, ba->mem_size,
++                                          &mem_size_actual))
++                panic("Invalid boot memory range\n");
+         }
+         printf("Correcting mem_size_actual to 0x%lx\n", mem_size_actual);
+     }
+@@ -171,6 +252,11 @@ void _start_c(void *boot_args, void *base)
+     adt =
+         (void *)(((u64)cur_boot_args.devtree) - cur_boot_args.virt_base + cur_boot_args.phys_base);
+ 
++#ifdef VLINUX_ENTRY_PROBE
++    entry_probe();
++#endif
++    boot_checkpoint(1);
++
+ #ifndef BRINGUP
+     int node = adt_path_offset(adt, "/cpus");
+     if (node >= 0) {
+@@ -191,19 +277,24 @@ void _start_c(void *boot_args, void *base)
+     else
+         msr(TPIDR_EL1, cpu_id);
+ 
++    boot_checkpoint(2);
+     int ret = uart_init();
+     if (ret < 0) {
+         debug_putc('!');
+     }
+ 
+     /* Use Dockchannel as a secondary UART for now and ignore failure */
++    boot_checkpoint(3);
+     dockchannel_uart_init();
++    boot_checkpoint(4);
+ 
+     uart_puts("Initializing");
+     get_device_info();
+ 
+     printf("CPU init (MIDR: 0x%lx smp_id:0x%x)...\n", mrs(MIDR_EL1), smp_id());
++    boot_checkpoint(5);
+     init_cpu();
++    boot_checkpoint(6);
+     printf("\n");
+ 
+     printf("boot_args at %p\n", boot_args);
+@@ -211,7 +302,9 @@ void _start_c(void *boot_args, void *base)
+     dump_boot_args(&cur_boot_args);
+     printf("\n");
+ 
++    boot_checkpoint(7);
+     exception_initialize();
++    boot_checkpoint(8);
+     m1n1_main();
+ }
+ 
+diff --git a/src/utils.c b/src/utils.c
+index fd8b2cdee610ff0dbef792ffcce94c7b06395ed2..fe8d6d458b78a6834032f0078db9665a32c39d1b 100644
+--- a/src/utils.c
++++ b/src/utils.c
+@@ -4,6 +4,7 @@
+ #include <stdarg.h>
+ 
+ #include "utils.h"
++#include "boot_trace.h"
+ #include "cpu_regs.h"
+ #include "iodev.h"
+ #include "smp.h"
+@@ -129,7 +130,12 @@ bool timeout_expired(u64 timeout)
+ void flush_and_reboot(void)
+ {
+     iodev_console_flush();
++#ifdef VLINUX_HANDOFF_TRACE
++    /* Preserve a diagnostic failure instead of voluntarily restarting it. */
++    boot_trace_hold();
++#else
+     reboot();
++#endif
+ }
+ 
+ void spin_init(spinlock_t *lock)
+diff --git a/src/xnuboot.h b/src/xnuboot.h
+index f713f0319caa7eac67734c6b52644fc6d13566ee..7cd75c6ff57f24b1f5e98ccee36f0f71055142f7 100644
+--- a/src/xnuboot.h
++++ b/src/xnuboot.h
+@@ -3,6 +3,21 @@
+ #ifndef XNUBOOT_H
+ #define XNUBOOT_H
+ 
++#include "types.h"
++
++static inline bool boot_mem_size_from_range(u64 dram_base, u64 phys_base, u64 usable_size,
++                                            u64 *size)
++{
++    const u64 rounding = (1UL << 30) - 1;
++    if (!usable_size || phys_base < dram_base || usable_size > UINT64_MAX - phys_base)
++        return false;
++    u64 span = phys_base + usable_size - dram_base;
++    if (span > UINT64_MAX - rounding)
++        return false;
++    *size = (span + rounding) & ~rounding;
++    return true;
++}
++
+ #define CMDLINE_LENGTH_RV1 256
+ #define CMDLINE_LENGTH_RV2 608
+ #define CMDLINE_LENGTH_RV3 1024

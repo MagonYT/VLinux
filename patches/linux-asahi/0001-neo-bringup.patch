@@ -1,0 +1,3015 @@
+diff --git a/.host_include/vlinux_cpio_compat.h b/.host_include/vlinux_cpio_compat.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..f53032537ab2c4448eee13f1d9e27492345a64cc
+--- /dev/null
++++ b/.host_include/vlinux_cpio_compat.h
+@@ -0,0 +1,26 @@
++/* VLinux: macOS host-build compat shim for usr/gen_init_cpio.c
++ *
++ * Two Linux-only APIs are used by this host tool:
++ *
++ *  - copy_file_range(2): Linux-specific. gen_init_cpio already treats a
++ *    short/failed copy as non-fatal and falls back to a read()/write() loop
++ *    ("short or failed copy falls back to read/write..."), so forcing it to
++ *    fail is correct and simply always takes the portable path.
++ *
++ *  - O_LARGEFILE: Linux-specific. macOS uses a 64-bit off_t unconditionally,
++ *    so the flag is a no-op and 0 is the correct value.
++ */
++#ifndef _VLINUX_CPIO_COMPAT_H
++#define _VLINUX_CPIO_COMPAT_H
++
++#ifdef __APPLE__
++
++#ifndef O_LARGEFILE
++#define O_LARGEFILE 0
++#endif
++
++/* Always fail -> gen_init_cpio uses its own read()/write() fallback loop. */
++#define copy_file_range(fd_in, off_in, fd_out, off_out, len, flags) ((ssize_t)-1)
++
++#endif /* __APPLE__ */
++#endif /* _VLINUX_CPIO_COMPAT_H */
+diff --git a/arch/arm64/boot/dts/apple/Makefile b/arch/arm64/boot/dts/apple/Makefile
+index 69d4f031527429e819d9a8fc2a05dacfc7a253c9..83ee9012405aba869fa50a381ebed6fda6cdb1f9 100644
+--- a/arch/arm64/boot/dts/apple/Makefile
++++ b/arch/arm64/boot/dts/apple/Makefile
+@@ -109,3 +109,4 @@ dtb-$(CONFIG_ARCH_APPLE) += t8122-j434.dtb
+ dtb-$(CONFIG_ARCH_APPLE) += t8122-j504.dtb
+ dtb-$(CONFIG_ARCH_APPLE) += t8122-j613.dtb
+ dtb-$(CONFIG_ARCH_APPLE) += t8122-j615.dtb
++dtb-$(CONFIG_ARCH_APPLE) += t8140-j700.dtb
+diff --git a/arch/arm64/boot/dts/apple/t8140-j700.dts b/arch/arm64/boot/dts/apple/t8140-j700.dts
+new file mode 100644
+index 0000000000000000000000000000000000000000..029d6fdda3adee43bcc85cfbd28269b2498bca27
+--- /dev/null
++++ b/arch/arm64/boot/dts/apple/t8140-j700.dts
+@@ -0,0 +1,52 @@
++// SPDX-License-Identifier: GPL-2.0+ OR MIT
++/*
++ * Apple MacBook Neo
++ *
++ * target-type: J700
++ *
++ * Copyright The Asahi Linux Contributors
++ */
++
++/dts-v1/;
++
++#include "t8140.dtsi"
++
++/ {
++	compatible = "apple,j700", "apple,t8140", "apple,arm-platform";
++	model = "Apple MacBook Neo";
++
++	aliases {
++		serial0 = &serial0;
++	};
++
++	chosen {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		stdout-path = "serial0";
++
++		framebuffer0: framebuffer@0 {
++			compatible = "apple,simple-framebuffer", "simple-framebuffer";
++			reg = <0 0 0 0>; /* To be filled by loader */
++			/* Format properties will be added by loader */
++			status = "disabled";
++		};
++	};
++
++	reserved-memory {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++		/* To be filled by loader */
++	};
++
++	memory@800000000 {
++		device_type = "memory";
++		reg = <0x100 0 0x2 0>; /* To be filled by loader */
++	};
++};
++
++&serial0 {
++	status = "okay";
++};
+diff --git a/arch/arm64/boot/dts/apple/t8140-pmgr.dtsi b/arch/arm64/boot/dts/apple/t8140-pmgr.dtsi
+new file mode 100644
+index 0000000000000000000000000000000000000000..91bdb84510fde745e1acc5bbb33c7bdb250c2080
+--- /dev/null
++++ b/arch/arm64/boot/dts/apple/t8140-pmgr.dtsi
+@@ -0,0 +1,771 @@
++&pmgr {
++	ps_sep_aon: power-controller@60 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x60 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "sep_aon";
++		apple,always-on;
++	};
++
++	ps_msg: power-controller@108 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x108 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "msg";
++	};
++
++	ps_aic: power-controller@110 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x110 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "aic";
++		apple,always-on;
++	};
++
++	ps_dwi: power-controller@118 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x118 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "dwi";
++	};
++
++	ps_gpio: power-controller@120 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x120 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "gpio";
++	};
++
++	ps_pmc: power-controller@138 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x138 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "pmc";
++	};
++
++	ps_pms_fpwm0: power-controller@140 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x140 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "pms_fpwm0";
++	};
++
++	ps_pms_fpwm1: power-controller@148 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x148 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "pms_fpwm1";
++	};
++
++	ps_pms_fpwm2: power-controller@150 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x150 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "pms_fpwm2";
++	};
++
++	ps_pms_fpwm3: power-controller@158 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x158 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "pms_fpwm3";
++	};
++
++	ps_pms_fpwm4: power-controller@160 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x160 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "pms_fpwm4";
++	};
++
++	ps_pms_c1ppt: power-controller@168 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x168 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "pms_c1ppt";
++		apple,always-on;
++	};
++
++	ps_soc_rc: power-controller@170 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x170 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "soc_rc";
++	};
++
++	ps_soc_dpe: power-controller@178 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x178 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "soc_dpe";
++		apple,always-on;
++	};
++
++	ps_pmgr_soc_ocla: power-controller@180 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x180 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "pmgr_soc_ocla";
++	};
++
++	ps_ispsens0: power-controller@188 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x188 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "ispsens0";
++	};
++
++	ps_ispsens1: power-controller@190 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x190 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "ispsens1";
++	};
++
++	ps_ap_tmm: power-controller@1a0 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x1a0 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "ap_tmm";
++	};
++
++	ps_afggfxni0: power-controller@1b8 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x1b8 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "afggfxni0";
++		apple,always-on;
++	};
++
++	ps_gfx: power-controller@1f0 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x1f0 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "gfx";
++	};
++
++	ps_jpg: power-controller@230 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x230 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "jpg";
++	};
++
++	ps_msr: power-controller@238 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x238 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "msr";
++	};
++
++	ps_venc0_sys: power-controller@240 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x240 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "venc0_sys";
++	};
++
++	ps_prores: power-controller@250 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x250 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "prores";
++	};
++
++	ps_apcie_gp: power-controller@258 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x258 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "apcie_gp";
++	};
++
++	ps_isp_sys: power-controller@268 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x268 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "isp_sys";
++	};
++
++	ps_ans: power-controller@278 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x278 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "ans";
++		apple,always-on;
++	};
++
++	ps_disp_sys: power-controller@280 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x280 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "disp_sys";
++		apple,always-on; /* TODO: figure out if we can enable PM here */
++	};
++
++	ps_dispext0_sys: power-controller@288 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x288 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "dispext0_sys";
++	};
++
++	ps_ane_sys: power-controller@290 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x290 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "ane_sys";
++	};
++
++	ps_msr_ase_core: power-controller@298 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x298 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "msr_ase_core";
++		power-domains = <&ps_msr>;
++	};
++
++	ps_apcie_sys_gp: power-controller@2a0 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x2a0 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "apcie_sys_gp";
++		power-domains = <&ps_apcie_gp>;
++	};
++
++	ps_sio_cpu: power-controller@2a8 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x2a8 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "sio_cpu";
++	};
++
++	ps_fpwm0: power-controller@2b0 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x2b0 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "fpwm0";
++	};
++
++	ps_fpwm1: power-controller@2b8 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x2b8 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "fpwm1";
++	};
++
++	ps_fpwm2: power-controller@2c0 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x2c0 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "fpwm2";
++	};
++
++	ps_i2c0: power-controller@2c8 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x2c8 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "i2c0";
++	};
++
++	ps_i2c1: power-controller@2d0 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x2d0 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "i2c1";
++	};
++
++	ps_i2c2: power-controller@2d8 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x2d8 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "i2c2";
++	};
++
++	ps_i2c3: power-controller@2e0 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x2e0 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "i2c3";
++	};
++
++	ps_i2c4: power-controller@2e8 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x2e8 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "i2c4";
++	};
++
++	ps_spi_p: power-controller@2f0 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x2f0 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "spi_p";
++	};
++
++	ps_uart_p: power-controller@2f8 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x2f8 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "uart_p";
++	};
++
++	ps_dpa_p: power-controller@300 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x300 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "dpa_p";
++		apple,always-on;
++	};
++
++	ps_aes: power-controller@308 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x308 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "aes";
++	};
++
++	ps_apcie_st: power-controller@310 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x310 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "apcie_st";
++		power-domains = <&ps_ans>;
++	};
++
++	ps_disp_fe: power-controller@318 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x318 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "disp_fe";
++		power-domains = <&ps_disp_sys>;
++		apple,always-on; /* TODO: figure out if we can enable PM here */
++	};
++
++	ps_dispext0_fe: power-controller@320 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x320 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "dispext0_fe";
++		power-domains = <&ps_dispext0_sys>;
++	};
++
++	ps_dispext0_cpu: power-controller@328 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x328 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "dispext0_cpu";
++		power-domains = <&ps_dispext0_fe>;
++
++		status = "disabled"; /* Locked, don't touch it */
++	};
++
++	ps_spi0: power-controller@330 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x330 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "spi0";
++		power-domains = <&ps_spi_p>;
++	};
++
++	ps_spi1: power-controller@338 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x338 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "spi1";
++		power-domains = <&ps_spi_p>;
++	};
++
++	ps_spi2: power-controller@340 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x340 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "spi2";
++		power-domains = <&ps_spi_p>;
++	};
++
++	ps_spi3: power-controller@348 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x348 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "spi3";
++		power-domains = <&ps_spi_p>;
++	};
++
++	ps_qspi: power-controller@350 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x350 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "qspi";
++		power-domains = <&ps_spi_p>;
++	};
++
++	ps_uart_n: power-controller@358 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x358 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "uart_n";
++		power-domains = <&ps_uart_p>;
++	};
++
++	ps_uart0: power-controller@360 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x360 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "uart0";
++		power-domains = <&ps_uart_p>;
++	};
++
++	ps_uart1: power-controller@368 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x368 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "uart1";
++		power-domains = <&ps_uart_p>;
++	};
++
++	ps_uart2: power-controller@370 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x370 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "uart2";
++		power-domains = <&ps_uart_p>;
++	};
++
++	ps_uart3: power-controller@378 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x378 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "uart3";
++		power-domains = <&ps_uart_p>;
++	};
++
++	ps_uart4: power-controller@380 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x380 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "uart4";
++		power-domains = <&ps_uart_p>;
++	};
++
++	ps_uart5: power-controller@388 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x388 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "uart5";
++		power-domains = <&ps_uart_p>;
++	};
++
++	ps_dpa0: power-controller@390 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x390 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "dpa0";
++		power-domains = <&ps_dpa_p>;
++	};
++
++	ps_dpa1: power-controller@398 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x398 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "dpa1";
++		power-domains = <&ps_dpa_p>;
++	};
++
++	ps_apcie_sys_st: power-controller@3a0 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x3a0 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "apcie_sys_st";
++		power-domains = <&ps_ans>, <&ps_apcie_st>;
++	};
++
++	ps_apcie_phy_sw: power-controller@3c0 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x3c0 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "apcie_phy_sw";
++		power-domains = <&ps_apcie_sys_st>, <&ps_apcie_sys_gp>;
++	};
++
++	ps_pmp: power-controller@3d0 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x3d0 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "pmp";
++		apple,always-on;
++	};
++
++	ps_pms_sram: power-controller@3d8 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x3d8 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "pms_sram";
++		apple,always-on;
++	};
++
++	ps_atc0_usb_aon: power-controller@3e0 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x3e0 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "atc0_usb_aon";
++	};
++
++	ps_atc0_common: power-controller@3e8 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x3e8 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "atc0_common";
++		power-domains = <&ps_atc0_usb_aon>;
++	};
++
++	ps_atc0_usb: power-controller@3f0 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x3f0 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "atc0_usb";
++		power-domains = <&ps_atc0_common>;
++	};
++
++	ps_sep: power-controller@c00 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0xc00 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "sep";
++		apple,always-on;
++	};
++
++	ps_venc0_dma: power-controller@8000 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x8000 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "venc0_dma";
++		power-domains = <&ps_venc0_sys>;
++	};
++
++	ps_venc0_pipe4: power-controller@8008 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x8008 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "venc0_pipe4";
++		power-domains = <&ps_venc0_dma>;
++	};
++
++	ps_venc0_pipe5: power-controller@8010 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x8010 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "venc0_pipe5";
++		power-domains = <&ps_venc0_dma>;
++	};
++
++	ps_venc0_me0: power-controller@8018 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x8018 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "venc0_me0";
++		power-domains = <&ps_venc0_dma>;
++	};
++
++	ps_venc0_me1: power-controller@8020 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x8020 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "venc0_me1";
++		power-domains = <&ps_venc0_me0>;
++	};
++};
++
++&pmgr_mini {
++	ps_debug_gated: power-controller@0 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x0 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "debug_gated";
++		apple,always-on;
++	};
++
++	ps_nub_spmi0: power-controller@58 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x58 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "nub_spmi0";
++		apple,always-on;
++	};
++
++	ps_nub_spmi1: power-controller@60 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x60 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "nub_spmi1";
++		apple,always-on;
++	};
++
++	ps_nub_spmi_a0: power-controller@68 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x68 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "nub_spmi_a0";
++		apple,always-on;
++	};
++
++	ps_nub_aon_nogate: power-controller@78 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x78 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "nub_aon_nogate";
++		apple,always-on;
++	};
++
++	ps_nub_ocla: power-controller@80 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x80 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "nub_ocla";
++		apple,always-on;
++	};
++
++	ps_nub_gpio: power-controller@88 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x88 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "nub_gpio";
++		apple,always-on;
++	};
++
++	ps_nub_fabric: power-controller@a0 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0xa0 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "nub_fabric";
++		apple,always-on;
++	};
++
++	ps_nub_sram: power-controller@a8 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0xa8 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "nub_sram";
++		apple,always-on;
++	};
++
++	ps_debug_switch: power-controller@b0 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0xb0 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "debug_switch";
++		apple,always-on;
++	};
++
++	ps_smc_i2cm0: power-controller@8028 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x8028 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "smc_i2cm0";
++		apple,always-on;
++	};
++
++	ps_smc_i2cm1: power-controller@8030 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x8030 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "smc_i2cm1";
++		apple,always-on;
++	};
++
++	ps_smc_i2cm2: power-controller@8038 {
++		compatible = "apple,t8140-pmgr-pwrstate", "apple,t8103-pmgr-pwrstate";
++		reg = <0x8038 4>;
++		#power-domain-cells = <0>;
++		#reset-cells = <0>;
++		label = "smc_i2cm2";
++		apple,always-on;
++	};
++};
+diff --git a/arch/arm64/boot/dts/apple/t8140.dtsi b/arch/arm64/boot/dts/apple/t8140.dtsi
+new file mode 100644
+index 0000000000000000000000000000000000000000..a1c6976abd5059a7c5ef261c990c73ba18fcdc5f
+--- /dev/null
++++ b/arch/arm64/boot/dts/apple/t8140.dtsi
+@@ -0,0 +1,202 @@
++// SPDX-License-Identifier: GPL-2.0+ OR MIT
++/*
++ * Apple T8140 "A18 Pro" SoC
++ *
++ * Copyright The Asahi Linux Contributors
++ */
++
++#include <dt-bindings/interrupt-controller/apple-aic.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++
++/ {
++	compatible = "apple,t8140", "apple,arm-platform";
++
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	cpus {
++		#address-cells = <2>;
++		#size-cells = <0>;
++
++		cpu-map {
++			cluster0 {
++				core0 {
++					cpu = <&cpu_e0>;
++				};
++				core1 {
++					cpu = <&cpu_e1>;
++				};
++				core2 {
++					cpu = <&cpu_e2>;
++				};
++				core3 {
++					cpu = <&cpu_e3>;
++				};
++			};
++
++			cluster1 {
++				core0 {
++					cpu = <&cpu_p0>;
++				};
++				core1 {
++					cpu = <&cpu_p1>;
++				};
++			};
++		};
++
++		cpu_e0: cpu@0 {
++			compatible = "apple,tahiti-e";
++			device_type = "cpu";
++			reg = <0x0 0x0>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0 0>;
++			next-level-cache = <&l2_cache_0>;
++			i-cache-size = <0x20000>;
++			d-cache-size = <0x10000>;
++		};
++
++		cpu_e1: cpu@1 {
++			compatible = "apple,tahiti-e";
++			device_type = "cpu";
++			reg = <0x0 0x1>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0 0>;
++			next-level-cache = <&l2_cache_0>;
++			i-cache-size = <0x20000>;
++			d-cache-size = <0x10000>;
++		};
++
++
++		cpu_e2: cpu@2 {
++			compatible = "apple,tahiti-e";
++			device_type = "cpu";
++			reg = <0x0 0x2>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0 0>;
++			next-level-cache = <&l2_cache_0>;
++			i-cache-size = <0x20000>;
++			d-cache-size = <0x10000>;
++		};
++
++		cpu_e3: cpu@3 {
++			compatible = "apple,tahiti-e";
++			device_type = "cpu";
++			reg = <0x0 0x3>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0 0>;
++			next-level-cache = <&l2_cache_0>;
++			i-cache-size = <0x20000>;
++			d-cache-size = <0x10000>;
++		};
++
++		cpu_p0: cpu@10100 {
++			compatible = "apple,tahiti-p";
++			device_type = "cpu";
++			reg = <0x0 0x10100>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0 0>;
++			next-level-cache = <&l2_cache_1>;
++			i-cache-size = <0x30000>;
++			d-cache-size = <0x20000>;
++		};
++
++		cpu_p1: cpu@10101 {
++			compatible = "apple,tahiti-p";
++			device_type = "cpu";
++			reg = <0x0 0x10101>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0 0>;
++			next-level-cache = <&l2_cache_1>;
++			i-cache-size = <0x30000>;
++			d-cache-size = <0x20000>;
++		};
++
++		l2_cache_0: l2-cache-0 {
++			compatible = "cache";
++			cache-level = <2>;
++			cache-unified;
++			cache-size = <0x400000>;
++		};
++
++		l2_cache_1: l2-cache-1 {
++			compatible = "cache";
++			cache-level = <2>;
++			cache-unified;
++			cache-size = <0x1000000>;
++		};
++	};
++
++	clkref: clock-ref {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <24000000>;
++		clock-output-names = "clkref";
++	};
++
++	soc: soc {
++		compatible = "simple-bus";
++		#address-cells = <2>;
++		#size-cells = <2>;
++
++		nonposted-mmio;
++		ranges;
++
++		pmgr: power-management@300700000 {
++			compatible = "apple,t8140-pmgr", "apple,t8103-pmgr", "syscon", "simple-mfd";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x3 0x700000 0 0x14000>;
++			/* child nodes are added in t8140-pmgr.dtsi */
++		};
++
++		aic: interrupt-controller@301000000 {
++			compatible = "apple,t8140-aic3", "apple,t8122-aic3";
++			#interrupt-cells = <3>;
++			interrupt-controller;
++			reg = <0x00000003 0x01000000 0x00000000 0x1cc000>,
++			      <0x00000003 0x01040000 0x00000000 0x4000>;
++			reg-names = "core", "event";
++			power-domains = <&ps_aic>;
++		};
++
++		pmgr_mini: power-management@308280000 {
++			compatible = "apple,t8140-pmgr", "apple,t8103-pmgr", "syscon", "simple-mfd";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x3 0x8280000 0 0xc000>;
++			/* child nodes are added in t8140-pmgr.dtsi */
++		};
++
++		wdt: watchdog@3082b0000 {
++			compatible = "apple,t8140-wdt", "apple,t8103-wdt";
++			reg = <0x3 0x082b0000 0x0 0x4000>;
++			clocks = <&clkref>;
++			interrupt-parent = <&aic>;
++			interrupts = <AIC_IRQ 507 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
++		serial0: serial@385200000 {
++			compatible = "apple,s5l-uart";
++			reg = <0x3 0x85200000 0x0 0x1000>;
++			reg-io-width = <4>;
++			interrupt-parent = <&aic>;
++			interrupts = <AIC_IRQ 1092 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&clkref>, <&clkref>;
++			clock-names = "uart", "clk_uart_baud0";
++			power-domains = <&ps_uart0>;
++			status = "disabled";
++		};
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupt-parent = <&aic>;
++		interrupt-names = "phys", "virt", "hyp-phys", "hyp-virt";
++		interrupts = <AIC_FIQ AIC_TMR_GUEST_PHYS IRQ_TYPE_LEVEL_HIGH>,
++		             <AIC_FIQ AIC_TMR_GUEST_VIRT IRQ_TYPE_LEVEL_HIGH>,
++		             <AIC_FIQ AIC_TMR_HV_PHYS IRQ_TYPE_LEVEL_HIGH>,
++		             <AIC_FIQ AIC_TMR_HV_VIRT IRQ_TYPE_LEVEL_HIGH>;
++	};
++};
++
++#include "t8140-pmgr.dtsi"
+diff --git a/drivers/hid/dockchannel-hid/Makefile b/drivers/hid/dockchannel-hid/Makefile
+index 7dba766b047fcc98110ef4c5aa5acd668a9cf403..8789e494e6b345d4b24609984af73f4002ba7234 100644
+--- a/drivers/hid/dockchannel-hid/Makefile
++++ b/drivers/hid/dockchannel-hid/Makefile
+@@ -4,3 +4,4 @@
+ #
+ 
+ obj-$(CONFIG_HID_DOCKCHANNEL)	+= dockchannel-hid.o
++obj-$(CONFIG_HID_DOCKCHANNEL)	+= hid-neo-trackpad.o
+diff --git a/drivers/hid/dockchannel-hid/dockchannel-hid.c b/drivers/hid/dockchannel-hid/dockchannel-hid.c
+index 9cab638b30c328da05b52158e11bf9e00bc61660..63ef121cc2b8590b4343127c4854cc8f916e49af 100644
+--- a/drivers/hid/dockchannel-hid/dockchannel-hid.c
++++ b/drivers/hid/dockchannel-hid/dockchannel-hid.c
+@@ -12,6 +12,7 @@
+ #include <linux/firmware.h>
+ #include <linux/gpio/consumer.h>
+ #include <linux/hid.h>
++#include <linux/mfd/macsmc.h>
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+ #include <linux/soc/apple/dockchannel.h>
+@@ -19,9 +20,16 @@
+ #include <linux/unaligned.h>
+ #include <linux/of.h>
+ #include "../hid-ids.h"
++#include "neo-trackpad.h"
+ 
+ #define COMMAND_TIMEOUT_MS 1000
+ #define START_TIMEOUT_MS 2000
++#define NEO_TRACKPAD_COMMAND_TIMEOUT_MS 5000
++#define NEO_TRACKPAD_READY_TIMEOUT_MS 5000
++#define NEO_TRACKPAD_FW_NAME "apple/tpmtfw-j700.bin"
++#define NEO_TRACKPAD_FW_HEADER 32
++#define NEO_TRACKPAD_FW_SIZE 75512
++#define NEO_TRACKPAD_FW_IFACE_OFFSET 75049
+ 
+ #define MAX_INTERFACES 16
+ 
+@@ -151,12 +159,23 @@ struct dchid_iface {
+ 
+ 	int index;
+ 	const char *name;
+-	const struct device_node *of_node;
++	struct device_node *of_node;
+ 
+ 	uint8_t tx_seq;
+ 	bool deferred;
+ 	bool starting;
+ 	bool open;
++	bool neo_trackpad_reuse;
++	bool neo_trackpad_upload;
++	bool neo_upload_attempted;
++	int neo_upload_error;
++	struct mutex neo_start_mutex;
++	struct apple_smc *neo_smc;
++	void *neo_firmware;
++	dma_addr_t neo_firmware_dma;
++	u8 reuse_report_logs;
++	u8 reuse_report_ids[8];
++	bool reuse_empty_logged;
+ 	struct completion ready;
+ 
+ 	void *hid_desc;
+@@ -193,6 +212,7 @@ struct dockchannel_hid {
+ 
+ 	/* Workqueue to asynchronously create HID devices */
+ 	struct workqueue_struct *new_iface_wq;
++	struct work_struct awake_work;
+ };
+ 
+ static ssize_t apple_layout_id_show(struct device *dev,
+@@ -231,6 +251,7 @@ dchid_get_interface(struct dockchannel_hid *dchid, int index, const char *name)
+ 	init_completion(&iface->out_complete);
+ 	init_completion(&iface->ready);
+ 	mutex_init(&iface->out_mutex);
++	mutex_init(&iface->neo_start_mutex);
+ 	iface->wq = alloc_ordered_workqueue("dchid-%s", WQ_MEM_RECLAIM, iface->name);
+ 	if (!iface->wq)
+ 		return NULL;
+@@ -246,6 +267,19 @@ dchid_get_interface(struct dockchannel_hid *dchid, int index, const char *name)
+ 		dev_warn(dchid->dev, "No OF node for subdevice %s, ignoring.", name);
+ 		return NULL;
+ 	}
++	iface->neo_trackpad_reuse = of_property_read_bool(iface->of_node,
++							 "apple,mtp-reuse-only");
++	if (iface->neo_trackpad_reuse)
++		dev_info(dchid->dev, "Neo trackpad reuse-only interface %u discovered\n", index);
++	iface->neo_trackpad_upload = of_property_read_bool(iface->of_node,
++							  "apple,mtp-upload-firmware");
++	if (iface->neo_trackpad_upload) {
++		if (index != 1) {
++			dev_err(dchid->dev, "Neo trackpad upload requires interface 1\n");
++			return NULL;
++		}
++		dev_info(dchid->dev, "Neo trackpad upload interface 1 discovered\n");
++	}
+ 
+ 	dchid->ifaces[index] = iface;
+ 	return iface;
+@@ -312,8 +346,9 @@ static int dchid_send(struct dchid_iface *iface, u32 flags, void *msg, size_t si
+ 	return 0;
+ }
+ 
+-static int dchid_cmd(struct dchid_iface *iface, u32 type, u32 req,
+-		     void *data, size_t size, void *resp_buf, size_t resp_size)
++static int dchid_cmd_timeout(struct dchid_iface *iface, u32 type, u32 req,
++			     void *data, size_t size, void *resp_buf, size_t resp_size,
++			     unsigned int timeout_ms)
+ {
+ 	int ret;
+ 	int report_id = *(u8*)data;
+@@ -331,7 +366,7 @@ static int dchid_cmd(struct dchid_iface *iface, u32 type, u32 req,
+ 	if (ret < 0)
+ 		goto done;
+ 
+-	if (!wait_for_completion_timeout(&iface->out_complete, msecs_to_jiffies(COMMAND_TIMEOUT_MS))) {
++	if (!wait_for_completion_timeout(&iface->out_complete, msecs_to_jiffies(timeout_ms))) {
+ 		dev_err(iface->dchid->dev, "output report 0x%x to iface  %d (%s) timed out\n",
+ 			report_id, iface->index, iface->name);
+ 		ret = -ETIMEDOUT;
+@@ -356,11 +391,166 @@ static int dchid_cmd(struct dchid_iface *iface, u32 type, u32 req,
+ 	return ret;
+ }
+ 
++static int dchid_cmd(struct dchid_iface *iface, u32 type, u32 req,
++                     void *data, size_t size, void *resp_buf, size_t resp_size)
++{
++	return dchid_cmd_timeout(iface, type, req, data, size, resp_buf, resp_size,
++				 COMMAND_TIMEOUT_MS);
++}
++
+ static int dchid_comm_cmd(struct dockchannel_hid *dchid, void *cmd, size_t size)
+ {
+ 	return dchid_cmd(dchid->comm, HID_FEATURE_REPORT, REQ_SET_REPORT, cmd, size, NULL, 0);
+ }
+ 
++static int dchid_neo_trackpad_cmd(struct dchid_iface *iface, void *cmd, size_t size)
++{
++	int ret;
++
++	/* The active J700 SCMFIFO driver uses a 5000 ms control-report timeout. */
++	ret = dchid_cmd_timeout(iface->dchid->comm, HID_FEATURE_REPORT, REQ_SET_REPORT,
++				cmd, size, NULL, 0, NEO_TRACKPAD_COMMAND_TIMEOUT_MS);
++	/* dchid_cmd returns the ACK payload length on success (normally one). */
++	return ret < 0 ? ret : 0;
++}
++
++static int dchid_neo_firmware_valid(const struct firmware *fw)
++{
++	const u8 *p = fw->data;
++	unsigned int i;
++
++	/* Only the independently decoded J700 HIDF v1 layout is supported. */
++	if (fw->size != NEO_TRACKPAD_FW_HEADER + NEO_TRACKPAD_FW_SIZE ||
++	    get_unaligned_le32(p) != FW_MAGIC || get_unaligned_le32(p + 4) != FW_VER ||
++	    get_unaligned_le32(p + 8) != NEO_TRACKPAD_FW_HEADER ||
++	    get_unaligned_le32(p + 12) != NEO_TRACKPAD_FW_SIZE ||
++	    get_unaligned_le32(p + 16) != NEO_TRACKPAD_FW_IFACE_OFFSET ||
++	    p[NEO_TRACKPAD_FW_HEADER + NEO_TRACKPAD_FW_IFACE_OFFSET] != 0)
++		return -EINVAL;
++	for (i = sizeof(struct fw_header); i < NEO_TRACKPAD_FW_HEADER; i++)
++		if (p[i])
++			return -EINVAL;
++	return 0;
++}
++
++static int dchid_neo_upload_firmware(struct dchid_iface *iface)
++{
++	const struct firmware *fw;
++	u8 msg[16] = { CMD_SEND_FIRMWARE, 2, 0, 1 };
++	int ret;
++
++	ret = request_firmware(&fw, NEO_TRACKPAD_FW_NAME, iface->dchid->dev);
++	if (ret)
++		return ret;
++	ret = dchid_neo_firmware_valid(fw);
++	if (ret)
++		goto release;
++	iface->neo_firmware = dmam_alloc_coherent(iface->dchid->dev, NEO_TRACKPAD_FW_SIZE,
++						 &iface->neo_firmware_dma, GFP_KERNEL);
++	if (!iface->neo_firmware) {
++		ret = -ENOMEM;
++		goto release;
++	}
++	memcpy(iface->neo_firmware, fw->data + NEO_TRACKPAD_FW_HEADER, NEO_TRACKPAD_FW_SIZE);
++	((u8 *)iface->neo_firmware)[NEO_TRACKPAD_FW_IFACE_OFFSET] = iface->index;
++	put_unaligned_le64(iface->neo_firmware_dma, msg + 4);
++	put_unaligned_le32(NEO_TRACKPAD_FW_SIZE, msg + 12);
++	/* Retain this one buffer even if the ACK is lost: the peer may own it. */
++	wmb();
++	dev_info(iface->dchid->dev, "Neo trackpad firmware DMA=%pad bytes=%u\n",
++		 &iface->neo_firmware_dma, NEO_TRACKPAD_FW_SIZE);
++	ret = dchid_neo_trackpad_cmd(iface, msg, sizeof(msg));
++	if (!ret)
++		dev_info(iface->dchid->dev, "Neo trackpad firmware registration acknowledged\n");
++release:
++	release_firmware(fw);
++	return ret;
++}
++
++static int dchid_neo_trackpad_power(struct dchid_iface *iface, bool on)
++{
++	u8 state = on ? 2 : 0;
++	u8 msg[9] = { CMD_RESET_INTERFACE, 2, 1, state, 0 };
++	u32 host_status = 0;
++	int ret, ack_ret;
++
++	/* Version 2 is WILL -> real host operation -> HAS with its result. */
++	ret = dchid_neo_trackpad_cmd(iface, msg, sizeof(msg));
++	if (ret)
++		return ret;
++	dev_info(iface->dchid->dev, "Neo trackpad WILL state=%u acknowledged\n", state);
++	ret = apple_smc_neo_trackpad_power(iface->neo_smc, on);
++	if (ret)
++		host_status = ret == -ENOENT ? 0xe00002f0 : 0xe00002e9;
++	/* The guarded provider includes J700's 50 ms delay after power off. */
++	dev_info(iface->dchid->dev, "Neo trackpad host power state=%u result=%d\n", state, ret);
++	msg[4] = 1;
++	put_unaligned_le32(host_status, msg + 5);
++	ack_ret = dchid_neo_trackpad_cmd(iface, msg, sizeof(msg));
++	if (!ack_ret)
++		dev_info(iface->dchid->dev, "Neo trackpad HAS state=%u status=%08x acknowledged\n",
++			 state, host_status);
++	return ret ? ret : ack_ret;
++}
++
++static int dchid_neo_trackpad_start(struct dchid_iface *iface)
++{
++	struct apple_smc *smc;
++	int ret;
++
++	mutex_lock(&iface->neo_start_mutex);
++	if (iface->neo_upload_attempted) {
++		ret = iface->neo_upload_error;
++		goto out;
++	}
++	if (iface->index != 1) {
++		ret = -EINVAL;
++		goto out;
++	}
++	/* Acquire only for the trackpad: an SMC failure must not block keyboard probe. */
++	smc = devm_apple_smc_neo_trackpad_get(iface->dchid->dev, iface->of_node);
++	if (IS_ERR(smc)) {
++		ret = PTR_ERR(smc);
++		dev_warn_ratelimited(iface->dchid->dev,
++			"Neo trackpad SMC unavailable: %d; no firmware/power operation\n", ret);
++		goto out;
++	}
++	iface->neo_smc = smc;
++	iface->neo_upload_attempted = true;
++	iface->starting = true;
++	dev_info(iface->dchid->dev, "Neo trackpad upload attempt; declared GPIO id=%d name=%s\n",
++		 iface->gpio_id, iface->gpio_name);
++	/* READY can precede the last HAS ACK; never clear completion afterwards. */
++	reinit_completion(&iface->ready);
++	ret = dchid_neo_upload_firmware(iface);
++	if (!ret)
++		ret = dchid_neo_trackpad_power(iface, false);
++	if (!ret)
++		ret = dchid_neo_trackpad_power(iface, true);
++	iface->neo_upload_error = ret;
++	if (ret)
++		dev_err(iface->dchid->dev, "Neo trackpad startup failed: %d; no retry this boot\n", ret);
++	else
++		dev_info(iface->dchid->dev, "Neo trackpad startup acknowledged; waiting for real ready\n");
++out:
++	mutex_unlock(&iface->neo_start_mutex);
++	return ret;
++}
++
++static void dchid_neo_awake_work(struct work_struct *work)
++{
++	struct dockchannel_hid *dchid = container_of(work, struct dockchannel_hid, awake_work);
++	u8 report[] = {0xc1, 0x02};
++	int ret;
++
++	/* J700's macOS FIFO handshake announces system-awake before enabling HID. */
++	ret = dchid_comm_cmd(dchid, report, sizeof(report));
++	if (ret < 0)
++		dev_warn(dchid->dev, "Neo system-awake report failed: %d\n", ret);
++	else
++		dev_info(dchid->dev, "Neo system-awake report acknowledged\n");
++}
++
+ static int dchid_enable_interface(struct dchid_iface *iface)
+ {
+ 	u8 msg[] = { CMD_ENABLE_INTERFACE, iface->index };
+@@ -424,6 +614,11 @@ static int dchid_get_firmware(struct dchid_iface *iface, void **firmware, size_t
+ 	if (ret)
+ 		return ret;
+ 
++	if (fw->size < sizeof(*hdr)) {
++		ret = -EINVAL;
++		goto done;
++	}
++
+ 	hdr = (struct fw_header *)fw->data;
+ 
+ 	if (hdr->magic != FW_MAGIC || hdr->version != FW_VER ||
+@@ -491,6 +686,11 @@ static int dchid_start_interface(struct dchid_iface *iface)
+ 	dev_info(iface->dchid->dev, "Starting interface %s\n", iface->name);
+ 
+ 	iface->starting = true;
++	if (iface->neo_trackpad_reuse) {
++		dev_info(iface->dchid->dev,
++			 "Neo trackpad reuse-only: waiting for ready; no firmware/reset/GPIO\n");
++		return 0;
++	}
+ 
+ 	/* Look to see if we need firmware */
+ 	ret = dchid_get_firmware(iface, &fw, &size);
+@@ -556,6 +756,22 @@ static int dchid_open(struct hid_device *hdev)
+ 	struct dchid_iface *iface = hdev->driver_data;
+ 	int ret;
+ 
++	if (iface->neo_trackpad_upload) {
++		/* Check the latched startup result even if a READY event arrived. */
++		ret = dchid_neo_trackpad_start(iface);
++		if (ret)
++			return ret;
++		if (!wait_for_completion_timeout(&iface->ready,
++						 msecs_to_jiffies(NEO_TRACKPAD_READY_TIMEOUT_MS))) {
++			dev_warn_ratelimited(iface->dchid->dev,
++				"Neo trackpad not ready after upload; reopen may wait, never reupload\n");
++			return -ETIMEDOUT;
++		}
++		iface->open = true;
++		dev_info_once(iface->dchid->dev, "Neo trackpad upload ready and HID opened\n");
++		return 0;
++	}
++
+ 	if (!completion_done(&iface->ready)) {
+ 		ret = dchid_start_interface(iface);
+ 		if (ret < 0)
+@@ -563,11 +779,18 @@ static int dchid_open(struct hid_device *hdev)
+ 
+ 		if (!wait_for_completion_timeout(&iface->ready, msecs_to_jiffies(START_TIMEOUT_MS))) {
+ 			dev_err(iface->dchid->dev, "iface %s start timed out\n", iface->name);
++			if (iface->neo_trackpad_reuse) {
++				iface->starting = false;
++				dev_warn_ratelimited(iface->dchid->dev,
++					"Neo trackpad not ready; reuse-only mode requires existing firmware, reopen may retry\n");
++			}
+ 			return -ETIMEDOUT;
+ 		}
+ 	}
+ 
+ 	iface->open = true;
++	if (iface->neo_trackpad_reuse)
++		dev_info_once(iface->dchid->dev, "Neo trackpad ready and HID opened\n");
+ 	return 0;
+ }
+ 
+@@ -605,6 +828,23 @@ static int dchid_raw_request(struct hid_device *hdev,
+ {
+ 	struct dchid_iface *iface = hdev->driver_data;
+ 
++	/* The Neo decoder may read only the proven D9 surface descriptor after READY. */
++	if (iface->neo_trackpad_upload && reportnum == NEO_TRACKPAD_DIMENSIONS &&
++	    rtype == HID_FEATURE_REPORT && reqtype == HID_REQ_GET_REPORT &&
++	    buf && len == 17 && iface->open && completion_done(&iface->ready) &&
++	    !iface->neo_upload_error) {
++		buf[0] = reportnum;
++		return dchid_cmd_timeout(iface, rtype, REQ_GET_REPORT, &reportnum, 1,
++					 buf + 1, len - 1, NEO_TRACKPAD_COMMAND_TIMEOUT_MS);
++	}
++
++	/* Only the reviewed startup path may send experimental trackpad commands. */
++	if (iface->neo_trackpad_reuse || iface->neo_trackpad_upload) {
++		dev_warn_ratelimited(iface->dchid->dev,
++				     "Neo trackpad: raw HID request rejected\n");
++		return -EOPNOTSUPP;
++	}
++
+ 	switch (reqtype) {
+ 	case HID_REQ_GET_REPORT:
+ 		buf[0] = reportnum;
+@@ -648,6 +888,8 @@ static void dchid_create_interface_work(struct work_struct *ws)
+ 		dev_warn(dchid->dev, "Failed to enable %s: %d\n", iface->name, ret);
+ 		return;
+ 	}
++	if (iface->neo_trackpad_reuse || iface->neo_trackpad_upload)
++		dev_info(dchid->dev, "Neo trackpad interface-enable acknowledged\n");
+ 
+ 	iface->deferred = false;
+ 
+@@ -666,6 +908,8 @@ static void dchid_create_interface_work(struct work_struct *ws)
+ 	hid->product = dchid->device_id.product_id;
+ 	hid->version = dchid->device_id.version_number;
+ 	hid->type = HID_TYPE_OTHER;
++	if (iface->neo_trackpad_upload)
++		hid->group = NEO_TRACKPAD_HID_GROUP;
+ 	if (!strcmp(iface->name, "multi-touch")) {
+ 		hid->type = HID_TYPE_SPI_MOUSE;
+ 	} else if (!strcmp(iface->name, "keyboard")) {
+@@ -785,6 +1029,11 @@ static void dchid_handle_init(struct dockchannel_hid *dchid, void *data, size_t
+ 	if (length < sizeof(*hdr))
+ 		return;
+ 
++	if (!memchr(hdr->name, '\0', sizeof(hdr->name))) {
++		dev_warn(dchid->dev, "Unterminated interface name\n");
++		return;
++	}
++
+ 	iface = dchid_get_interface(dchid, hdr->iface, hdr->name);
+ 	if (!iface)
+ 		return;
+@@ -808,7 +1057,7 @@ static void dchid_handle_init(struct dockchannel_hid *dchid, void *data, size_t
+ 		case INIT_GPIO_REQUEST: {
+ 			struct dchid_gpio_request *req = data;
+ 
+-			if (sizeof(*req) > length)
++			if (sizeof(*req) > blk->length)
+ 				break;
+ 
+ 			if (iface->gpio_id) {
+@@ -828,7 +1077,7 @@ static void dchid_handle_init(struct dockchannel_hid *dchid, void *data, size_t
+ 		case INIT_PRODUCT_NAME: {
+ 			char *product = data;
+ 
+-			if (product[blk->length - 1] != 0) {
++			if (!blk->length || product[blk->length - 1] != 0) {
+ 				dev_warn(dchid->dev, "Unterminated product name for %s\n",
+ 					 iface->name);
+ 			} else {
+@@ -877,6 +1126,12 @@ static void dchid_handle_gpio(struct dockchannel_hid *dchid, void *data, size_t
+ 		goto err;
+ 	}
+ 
++	if (iface->neo_trackpad_reuse || iface->neo_trackpad_upload) {
++		dev_warn_ratelimited(dchid->dev,
++				     "Neo trackpad: unsupported GPIO command %u rejected\n", cmd->cmd);
++		goto err;
++	}
++
+ 	if (dchid_request_gpio(iface) < 0)
+ 		goto err;
+ 
+@@ -920,6 +1175,10 @@ static void dchid_handle_gpio(struct dockchannel_hid *dchid, void *data, size_t
+ static void dchid_handle_event(struct dockchannel_hid *dchid, void *data, size_t length)
+ {
+ 	u8 *p = data;
++
++	if (!length)
++		return;
++
+ 	switch (*p) {
+ 	case EVENT_INIT:
+ 		dchid_handle_init(dchid, data, length);
+@@ -937,6 +1196,29 @@ static void dchid_handle_report(struct dchid_iface *iface, void *data, size_t le
+ {
+ 	struct dockchannel_hid *dchid = iface->dchid;
+ 
++	/* Idle packets must not consume the distinct-ID diagnostic budget. */
++	if (iface->neo_trackpad_reuse || iface->neo_trackpad_upload) {
++		if (!length && !iface->reuse_empty_logged) {
++			dev_info(dchid->dev, "Neo trackpad empty report\n");
++			iface->reuse_empty_logged = true;
++		} else if (length && iface->reuse_report_logs < ARRAY_SIZE(iface->reuse_report_ids)) {
++			u8 id = *(u8 *)data;
++			unsigned int i;
++
++			for (i = 0; i < iface->reuse_report_logs; i++)
++				if (iface->reuse_report_ids[i] == id)
++					break;
++			if (i == iface->reuse_report_logs) {
++				dev_info(dchid->dev,
++					 "Neo trackpad report id=%02x length=%zu ready=%u open=%u\n",
++					 id, length, completion_done(&iface->ready), iface->open);
++				iface->reuse_report_ids[iface->reuse_report_logs++] = id;
++				if (iface->reuse_report_logs == ARRAY_SIZE(iface->reuse_report_ids))
++					dev_info(dchid->dev, "Neo trackpad distinct report logging limit reached\n");
++			}
++		}
++	}
++
+ 	if (!iface->hid) {
+ 		dev_warn(dchid->dev, "Report received but %s is not initialized!\n", iface->name);
+ 		return;
+@@ -959,7 +1241,7 @@ static void dchid_packet_work(struct work_struct *ws)
+ 	if (shdr->length + sizeof(*shdr) > work->hdr.length) {
+ 		dev_err(dchid->dev, "Bad sub header length (%hu > %zu)\n",
+ 			shdr->length, work->hdr.length - sizeof(*shdr));
+-		return;
++		goto out;
+ 	}
+ 
+ 	switch (type) {
+@@ -974,6 +1256,7 @@ static void dchid_packet_work(struct work_struct *ws)
+ 		break;
+ 	}
+ 
++out:
+ 	kfree(work);
+ }
+ 
+@@ -1051,8 +1334,14 @@ static void dchid_handle_packet(void *cookie, size_t avail)
+ 	}
+ 
+ 
++	if (hdr.length < sizeof(struct dchid_subhdr)) {
++		dev_err(dchid->dev, "Short packet body (%hu)\n", hdr.length);
++		goto done;
++	}
++
+ 	if (hdr.iface >= MAX_INTERFACES) {
+ 		dev_err(dchid->dev, "Bad iface %d\n", hdr.iface);
++		goto done;
+ 	}
+ 
+ 	iface = dchid->ifaces[hdr.iface];
+@@ -1076,7 +1365,7 @@ static void dchid_handle_packet(void *cookie, size_t avail)
+ 
+ 	work = kzalloc(sizeof(*work) + hdr.length, GFP_KERNEL);
+ 	if (!work)
+-		return;
++		goto done;
+ 
+ 	work->hdr = hdr;
+ 	work->iface = iface;
+@@ -1089,6 +1378,70 @@ static void dchid_handle_packet(void *cookie, size_t avail)
+ 	dockchannel_await(dchid->dc, dchid_handle_packet, dchid, sizeof(struct dchid_hdr));
+ }
+ 
++static int dchid_validate_reuse_child(struct device *dev, const struct device_node *child)
++{
++	struct property *prop;
++	int len;
++
++	if (!of_find_property(child, "apple,mtp-reuse-only", &len))
++		return 0;
++	if (len)
++		return dev_err_probe(dev, -EINVAL,
++				     "apple,mtp-reuse-only must be a zero-length boolean\n");
++
++	if (!of_device_is_compatible(dev->of_node, "apple,t8140-dockchannel-hid") ||
++	    !of_node_name_eq(child, "multi-touch") ||
++	    !of_device_is_available(child) ||
++	    of_find_property(child, "apple,mtp-upload-firmware", NULL) ||
++	    of_find_property(child, "firmware-name", NULL))
++		return dev_err_probe(dev, -EINVAL,
++				     "Reuse-only requires enabled Neo multi-touch without firmware-name\n");
++
++	for_each_property_of_node(child, prop) {
++		size_t name_len = strlen(prop->name);
++
++		if (!strcmp(prop->name, "gpios") ||
++		    (name_len >= 6 && !strcmp(prop->name + name_len - 6, "-gpios")))
++			return dev_err_probe(dev, -EINVAL,
++					     "Reuse-only trackpad must not configure GPIOs\n");
++	}
++
++	return 1;
++}
++
++static int dchid_validate_upload_child(struct device *dev, const struct device_node *child)
++{
++	struct property *prop;
++	struct device_node *smc;
++	const char *name;
++	int len;
++
++	if (!of_find_property(child, "apple,mtp-upload-firmware", &len))
++		return 0;
++	if (len || !of_device_is_compatible(dev->of_node, "apple,t8140-dockchannel-hid") ||
++	    !of_node_name_eq(child, "multi-touch") || !of_device_is_available(child) ||
++	    of_find_property(child, "apple,mtp-reuse-only", NULL) ||
++	    of_property_read_string(child, "firmware-name", &name) ||
++	    strcmp(name, NEO_TRACKPAD_FW_NAME) ||
++	    of_property_count_u32_elems(child, "apple,smc") != 1)
++		return dev_err_probe(dev, -EINVAL, "Invalid Neo trackpad firmware/power opt-in\n");
++	for_each_property_of_node(child, prop) {
++		size_t name_len = strlen(prop->name);
++
++		if (!strcmp(prop->name, "gpios") ||
++		    (name_len >= 6 && !strcmp(prop->name + name_len - 6, "-gpios")))
++			return dev_err_probe(dev, -EINVAL, "Neo trackpad must not configure GPIOs\n");
++	}
++	smc = of_parse_phandle(child, "apple,smc", 0);
++	if (!smc)
++		return -EINVAL;
++	len = of_device_is_compatible(smc, "apple,t8140-smc") && of_device_is_available(smc);
++	of_node_put(smc);
++	if (!len)
++		return dev_err_probe(dev, -EINVAL, "Neo trackpad requires its guarded SMC provider\n");
++	return 1;
++}
++
+ static int dockchannel_hid_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -1109,6 +1462,38 @@ static int dockchannel_hid_probe(struct platform_device *pdev)
+ 
+ 	dchid->dev = dev;
+ 
++	/*
++	 * J700's MTP firmware does not expose the STM identity interface.
++	 * Use only explicit firmware-independent identity values supplied by
++	 * the board description; other machines keep the STM handshake.
++	 */
++	if (of_device_is_compatible(dev->of_node, "apple,t8140-dockchannel-hid")) {
++		u32 id[3];
++		int i;
++
++		if (of_property_count_u32_elems(dev->of_node, "apple,hid-id") != ARRAY_SIZE(id))
++			return dev_err_probe(dev, -EINVAL,
++					     "Expected vendor, product, version in apple,hid-id\n");
++
++		ret = of_property_read_u32_array(dev->of_node, "apple,hid-id", id,
++					     ARRAY_SIZE(id));
++		if (ret)
++			return ret;
++
++		for (i = 0; i < ARRAY_SIZE(id); i++) {
++			if (id[i] > U16_MAX)
++				return dev_err_probe(dev, -EINVAL,
++						     "HID identity value exceeds 16 bits\n");
++		}
++
++		dchid->device_id.vendor_id = id[0];
++		dchid->device_id.product_id = id[1];
++		dchid->device_id.version_number = id[2];
++		dchid->id_ready = true;
++		dev_info(dev, "Using board HID identity %04x:%04x version %04x (no STM)\n",
++			 id[0], id[1], id[2]);
++	}
++
+ 	/*
+ 	 * First make sure all the GPIOs are available, in cased we need to defer.
+ 	 * This is necessary because MTP will request them by name later, and by then
+@@ -1116,6 +1501,21 @@ static int dockchannel_hid_probe(struct platform_device *pdev)
+ 	 */
+ 
+ 	for_each_child_of_node(dev->of_node, child) {
++		ret = dchid_validate_upload_child(dev, child);
++		if (ret < 0) {
++			of_node_put(child);
++			return ret;
++		}
++		if (ret)
++			continue;
++		ret = dchid_validate_reuse_child(dev, child);
++		if (ret < 0) {
++			of_node_put(child);
++			return ret;
++		}
++		if (ret)
++			continue;
++
+ 		for_each_property_of_node(child, prop) {
+ 			size_t len = strlen(prop->name);
+ 			struct gpio_desc *gpio;
+@@ -1170,7 +1570,10 @@ static int dockchannel_hid_probe(struct platform_device *pdev)
+ 	if (IS_ERR_OR_NULL(dchid->dc)) {
+ 		return PTR_ERR(dchid->dc);
+ 	}
+-	dchid->new_iface_wq = alloc_workqueue("dchid-new", WQ_MEM_RECLAIM, 0);
++	if (of_device_is_compatible(dev->of_node, "apple,t8140-dockchannel-hid"))
++		dchid->new_iface_wq = alloc_ordered_workqueue("dchid-new", WQ_MEM_RECLAIM);
++	else
++		dchid->new_iface_wq = alloc_workqueue("dchid-new", WQ_MEM_RECLAIM, 0);
+ 	if (!dchid->new_iface_wq)
+ 		return -ENOMEM;
+ 
+@@ -1181,6 +1584,13 @@ static int dockchannel_hid_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	dev_info(dchid->dev, "Initialized, awaiting packets\n");
++	if (of_device_is_compatible(dev->of_node, "apple,t8140-dockchannel-hid")) {
++		/* Queue first so interface enable work follows the bounded handshake.
++		 * Replies are completed by the independent receive IRQ/comm queue.
++		 */
++		INIT_WORK(&dchid->awake_work, dchid_neo_awake_work);
++		queue_work(dchid->new_iface_wq, &dchid->awake_work);
++	}
+ 	dockchannel_await(dchid->dc, dchid_handle_packet, dchid, sizeof(struct dchid_hdr));
+ 
+ 	return 0;
+@@ -1192,6 +1602,7 @@ static void dockchannel_hid_remove(struct platform_device *pdev)
+ }
+ 
+ static const struct of_device_id dockchannel_hid_of_match[] = {
++	{ .compatible = "apple,t8140-dockchannel-hid" },
+ 	{ .compatible = "apple,dockchannel-hid" },
+ 	{},
+ };
+@@ -1202,6 +1613,8 @@ static struct platform_driver dockchannel_hid_driver = {
+ 	.driver = {
+ 		.name = "dockchannel-hid",
+ 		.of_match_table = dockchannel_hid_of_match,
++		/* Removal is unsupported; firmware can retain coherent DMA memory. */
++		.suppress_bind_attrs = true,
+ 	},
+ 	.probe = dockchannel_hid_probe,
+ 	.remove = dockchannel_hid_remove,
+diff --git a/drivers/hid/dockchannel-hid/hid-neo-trackpad.c b/drivers/hid/dockchannel-hid/hid-neo-trackpad.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..f55a66f95092d8c4c75e04ff61727ffa168d160e
+--- /dev/null
++++ b/drivers/hid/dockchannel-hid/hid-neo-trackpad.c
+@@ -0,0 +1,187 @@
++// SPDX-License-Identifier: GPL-2.0-only OR MIT
++/* J700 MTP report75 decoder. Firmware/power remains owned by DockChannel. */
++#include <linux/hid.h>
++#include <linux/input/mt.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/workqueue.h>
++#include "neo-trackpad.h"
++
++struct neo_trackpad {
++	struct hid_device *hdev;
++	struct work_struct start_work;
++	struct input_dev *input;
++	struct input_mt_pos positions[NEO_TRACKPAD_CONTACTS];
++	int slots[NEO_TRACKPAD_CONTACTS];
++	bool registered;
++	bool opened;
++	bool layout_logged;
++};
++
++static int neo_trackpad_raw_event(struct hid_device *hdev, struct hid_report *report,
++				 u8 *data, int size)
++{
++	struct neo_trackpad *tp = hid_get_drvdata(hdev);
++	struct neo_tp_frame frame;
++	unsigned int i;
++	int ret;
++
++	if (size <= 0 || data[0] != NEO_TRACKPAD_REPORT || !smp_load_acquire(&tp->registered))
++		return 0;
++	ret = neo_tp_parse_frame(data, size, &frame);
++	if (ret) {
++		hid_warn_ratelimited(hdev, "Neo trackpad rejected report75 layout (bytes=%d)\n", size);
++		return ret;
++	}
++	for (i = 0; i < frame.active; i++) {
++		tp->positions[i].x = frame.contacts[i].x;
++		tp->positions[i].y = frame.contacts[i].y;
++	}
++	ret = input_mt_assign_slots(tp->input, tp->slots, tp->positions, frame.active, 0);
++	if (ret)
++		return ret;
++	for (i = 0; i < frame.active; i++) {
++		input_mt_slot(tp->input, tp->slots[i]);
++		input_mt_report_slot_state(tp->input, MT_TOOL_FINGER, true);
++		input_report_abs(tp->input, ABS_MT_POSITION_X, frame.contacts[i].x);
++		input_report_abs(tp->input, ABS_MT_POSITION_Y, frame.contacts[i].y);
++		input_report_abs(tp->input, ABS_MT_TOUCH_MAJOR, frame.contacts[i].major);
++		input_report_abs(tp->input, ABS_MT_TOUCH_MINOR, frame.contacts[i].minor);
++	}
++	input_mt_sync_frame(tp->input);
++	input_report_key(tp->input, BTN_LEFT, frame.buttons);
++	input_sync(tp->input);
++	if (!tp->layout_logged) {
++		hid_info(hdev, "Neo trackpad decoded report75: bytes=%d offset=%u stride=%u contacts=%u active=%u; input emitted\n",
++			 size, frame.offset, frame.stride, frame.count, frame.active);
++		tp->layout_logged = true;
++	}
++	return 1;
++}
++
++static void neo_trackpad_start_work(struct work_struct *work)
++{
++	struct neo_trackpad *tp = container_of(work, struct neo_trackpad, start_work);
++	struct hid_device *hdev = tp->hdev;
++	struct neo_tp_dimensions dim;
++	struct input_dev *input;
++	u8 dimensions[17] = { NEO_TRACKPAD_DIMENSIONS };
++	int ret;
++
++	ret = hid_hw_open(hdev);
++	if (ret) {
++		hid_err(hdev, "Neo trackpad decoder startup failed: %d\n", ret);
++		return;
++	}
++	tp->opened = true;
++	ret = hid_hw_raw_request(hdev, NEO_TRACKPAD_DIMENSIONS, dimensions,
++				 sizeof(dimensions), HID_FEATURE_REPORT, HID_REQ_GET_REPORT);
++	if (ret != sizeof(dimensions)) {
++		hid_err(hdev, "Neo trackpad D9 dimensions request failed: %d\n", ret);
++		ret = ret < 0 ? ret : -EINVAL;
++		goto close;
++	}
++	ret = neo_tp_parse_dimensions(dimensions, sizeof(dimensions), &dim);
++	if (ret) {
++		hid_err(hdev, "Neo trackpad D9 dimensions invalid\n");
++		goto close;
++	}
++	input = devm_input_allocate_device(&hdev->dev);
++	if (!input) {
++		ret = -ENOMEM;
++		goto close;
++	}
++	tp->input = input;
++	input->name = "Apple Neo Trackpad";
++	input->phys = hdev->phys;
++	input->id.bustype = hdev->bus;
++	input->id.vendor = hdev->vendor;
++	input->id.product = hdev->product;
++	input->id.version = hdev->version;
++	input_set_capability(input, EV_KEY, BTN_LEFT);
++	__set_bit(INPUT_PROP_BUTTONPAD, input->propbit);
++	input_set_abs_params(input, ABS_MT_POSITION_X, dim.min_x, dim.max_x, 0, 0);
++	input_set_abs_params(input, ABS_MT_POSITION_Y, -dim.max_y, -dim.min_y, 0, 0);
++	input_abs_set_res(input, ABS_MT_POSITION_X, dim.res_x);
++	input_abs_set_res(input, ABS_MT_POSITION_Y, dim.res_y);
++	input_set_abs_params(input, ABS_MT_TOUCH_MAJOR, 0, 65534, 0, 0);
++	input_set_abs_params(input, ABS_MT_TOUCH_MINOR, 0, 65534, 0, 0);
++	/* Neo has no force sensor; do not advertise fabricated pressure. */
++	ret = input_mt_init_slots(input, NEO_TRACKPAD_CONTACTS,
++				 INPUT_MT_POINTER | INPUT_MT_DROP_UNUSED | INPUT_MT_TRACK);
++	if (ret)
++		goto close;
++	input_set_events_per_packet(input, 128);
++	ret = input_register_device(input);
++	if (ret)
++		goto close;
++	smp_store_release(&tp->registered, true);
++	hid_info(hdev, "Neo trackpad decoder registered; D9 %ux%u bounds %d..%d/%d..%d resolution %d/%d; report75 enabled\n",
++		 dim.width, dim.height, dim.min_x, dim.max_x, dim.min_y, dim.max_y,
++		 dim.res_x, dim.res_y);
++	return;
++close:
++	hid_err(hdev, "Neo trackpad input registration stopped: %d\n", ret);
++	hid_hw_close(hdev);
++	tp->opened = false;
++}
++
++static int neo_trackpad_probe(struct hid_device *hdev, const struct hid_device_id *id)
++{
++	struct neo_trackpad *tp;
++	struct hid_report *report;
++	int ret;
++
++	if (hdev->type != HID_TYPE_SPI_MOUSE || !hdev->dev.parent ||
++	    !of_device_is_compatible(hdev->dev.parent->of_node, "apple,t8140-dockchannel-hid"))
++		return -ENODEV;
++	tp = devm_kzalloc(&hdev->dev, sizeof(*tp), GFP_KERNEL);
++	if (!tp)
++		return -ENOMEM;
++	tp->hdev = hdev;
++	INIT_WORK(&tp->start_work, neo_trackpad_start_work);
++	hid_set_drvdata(hdev, tp);
++	ret = hid_parse(hdev);
++	if (ret)
++		return ret;
++	/* The real HID descriptor does not advertise this vendor report. */
++	report = hid_register_report(hdev, HID_INPUT_REPORT, NEO_TRACKPAD_REPORT, 0);
++	if (!report)
++		return -ENOMEM;
++	report->size = 0;
++	ret = hid_hw_start(hdev, 0);
++	if (ret)
++		return ret;
++	/* Leave the ordered interface-creation queue free to register the keyboard. */
++	queue_work(system_long_wq, &tp->start_work);
++	return 0;
++}
++
++static void neo_trackpad_remove(struct hid_device *hdev)
++{
++	struct neo_trackpad *tp = hid_get_drvdata(hdev);
++
++	cancel_work_sync(&tp->start_work);
++	smp_store_release(&tp->registered, false);
++	if (tp->opened)
++		hid_hw_close(hdev);
++	hid_hw_stop(hdev);
++}
++
++static const struct hid_device_id neo_trackpad_ids[] = {
++	{ HID_DEVICE(BUS_HOST, NEO_TRACKPAD_HID_GROUP, 0, 0) },
++	{ }
++};
++MODULE_DEVICE_TABLE(hid, neo_trackpad_ids);
++
++static struct hid_driver neo_trackpad_driver = {
++	.name = "neo-trackpad",
++	.id_table = neo_trackpad_ids,
++	.probe = neo_trackpad_probe,
++	.remove = neo_trackpad_remove,
++	.raw_event = neo_trackpad_raw_event,
++	.driver = { .suppress_bind_attrs = true },
++};
++module_hid_driver(neo_trackpad_driver);
++MODULE_LICENSE("Dual MIT/GPL");
++MODULE_DESCRIPTION("Experimental Apple J700 MTP trackpad decoder");
+diff --git a/drivers/hid/dockchannel-hid/neo-trackpad.h b/drivers/hid/dockchannel-hid/neo-trackpad.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..9f1bd86a06432c46ede291a335db71d2044c1583
+--- /dev/null
++++ b/drivers/hid/dockchannel-hid/neo-trackpad.h
+@@ -0,0 +1,115 @@
++/* SPDX-License-Identifier: GPL-2.0-only OR MIT */
++#ifndef _NEO_TRACKPAD_H
++#define _NEO_TRACKPAD_H
++
++#include <linux/errno.h>
++#include <linux/types.h>
++#include <linux/unaligned.h>
++
++/* Private group shared only by the experimental Neo transport and decoder. */
++#define NEO_TRACKPAD_HID_GROUP 0xff00
++#define NEO_TRACKPAD_REPORT 0x75
++#define NEO_TRACKPAD_DIMENSIONS 0xd9
++#define NEO_TRACKPAD_CONTACTS 32
++
++struct neo_tp_dimensions {
++	int min_x, max_x, min_y, max_y, res_x, res_y;
++	u32 width, height;
++};
++
++struct neo_tp_contact {
++	int x, y, major, minor;
++};
++
++struct neo_tp_frame {
++	u16 offset, stride;
++	u8 count, active, buttons;
++	struct neo_tp_contact contacts[NEO_TRACKPAD_CONTACTS];
++};
++
++static inline int neo_tp_parse_dimensions(const u8 *data, size_t size,
++				   struct neo_tp_dimensions *dim)
++{
++	u32 x_span, y_span;
++
++	if (size != 17 || data[0] != NEO_TRACKPAD_DIMENSIONS)
++		return -EINVAL;
++	dim->width = get_unaligned_le32(data + 1);
++	dim->height = get_unaligned_le32(data + 5);
++	dim->min_x = (s16)get_unaligned_le16(data + 9);
++	dim->min_y = (s16)get_unaligned_le16(data + 11);
++	dim->max_x = (s16)get_unaligned_le16(data + 13);
++	dim->max_y = (s16)get_unaligned_le16(data + 15);
++	if (!dim->width || !dim->height || dim->min_x >= dim->max_x ||
++	    dim->min_y >= dim->max_y)
++		return -EINVAL;
++	x_span = dim->max_x - dim->min_x;
++	y_span = dim->max_y - dim->min_y;
++	/* Dimensions are hundredths of a millimetre; spans fit signed16 ranges. */
++	dim->res_x = 100 * x_span / dim->width;
++	dim->res_y = 100 * y_span / dim->height;
++	if (!dim->res_x || !dim->res_y)
++		return -EINVAL;
++	return 0;
++}
++
++/* V4 framing follows the working macOS parser, not fixed 38+30N sizing. */
++static inline int neo_tp_parse_frame(const u8 *data, size_t size, struct neo_tp_frame *frame)
++{
++	size_t header, auxiliary, paths, image, extra, offset, stride;
++	unsigned int count, i;
++	u16 flags;
++
++	if (size < 32 || size > 4096 || data[0] != NEO_TRACKPAD_REPORT || data[3] != 4)
++		return -EINVAL;
++	header = data[2];
++	flags = get_unaligned_le16(data + 12);
++	auxiliary = get_unaligned_le16(data + 14);
++	paths = get_unaligned_le16(data + 16);
++	image = get_unaligned_le16(data + 18);
++	extra = get_unaligned_le16(data + 20);
++	count = data[22];
++	if (header < 32 || header > size || (auxiliary != 0 && auxiliary != 6) ||
++	    count > NEO_TRACKPAD_CONTACTS)
++		return -EINVAL;
++	offset = header + auxiliary;
++	/* All operands are bounded u8/u16, and size_t is at least32 bits. */
++	if (offset + paths + image + extra > size)
++		return -EINVAL;
++	if (!count) {
++		if (paths)
++			return -EINVAL;
++		stride = 0;
++	} else {
++		if (!(flags & 2) || !paths || paths % count)
++			return -EINVAL;
++		stride = paths / count;
++		/* macOS supports variable records; we use only the verified prefix. */
++		if (stride < 20 || stride > 64 || stride % 2)
++			return -EINVAL;
++	}
++	frame->offset = offset;
++	frame->stride = stride;
++	frame->count = count;
++	frame->active = 0;
++	frame->buttons = data[23] & 1;
++	for (i = 0; i < count; i++) {
++		const u8 *p = data + offset + i * stride;
++		struct neo_tp_contact *contact;
++		int major = (s16)get_unaligned_le16(p + 18);
++
++		/* As in the established MTP decoder, zero touch area is not contact. */
++		if (major <= 0)
++			continue;
++		contact = &frame->contacts[frame->active++];
++		contact->x = (s16)get_unaligned_le16(p + 4);
++		contact->y = -(int)(s16)get_unaligned_le16(p + 6);
++		contact->major = major * 2;
++		contact->minor = stride >= 22 ? (s16)get_unaligned_le16(p + 20) : major;
++		if (contact->minor < 0)
++			contact->minor = 0;
++		contact->minor *= 2;
++	}
++	return 0;
++}
++#endif
+diff --git a/drivers/iommu/apple-dart.c b/drivers/iommu/apple-dart.c
+index 8b4452b07a54ec5ceec58d8ff4db730febcb8aed..2788fbd20e0b6fc621f790459f0c42870726cede 100644
+--- a/drivers/iommu/apple-dart.c
++++ b/drivers/iommu/apple-dart.c
+@@ -147,6 +147,15 @@
+ #define DART_T8110_TTBR_ADDR_FIELD_SHIFT 2
+ #define DART_T8110_TTBR_SHIFT 14
+ 
++/* Neo-only Gen2.2+ fault ABI, verified against current macOS/SPTM. */
++#define DART_T8110_V2_ERROR_PENDING 0x4000
++#define DART_T8110_V2_ERROR_MASK 0x4060
++#define DART_T8110_V2_ERROR_RECORD 0x8000
++#define DART_T8110_V2_ERROR_RECORD_STRIDE 0x40
++#define DART_T8110_V2_DIAG_LOCK 0x210
++#define DART_T8110_V2_LOCK_ON_ERR BIT(1)
++#define DART_T8110_V2_TLB_UNLOCK 0x400
++
+ #define DART_TCR(dart, sid) ((dart)->hw->tcr + ((sid) << 2))
+ 
+ #define DART_TTBR(dart, sid, idx) ((dart)->hw->ttbr + \
+@@ -233,6 +242,10 @@ struct apple_dart {
+ 	struct iommu_group *sid2group[DART_MAX_STREAMS];
+ 	struct iommu_device iommu;
+ 
++	bool neo_fault_v2;
++	u32 neo_aux_status;
++	u32 neo_aux_enable;
++
+ 	u32 save_tcr[DART_MAX_STREAMS];
+ 	u32 save_ttbr[DART_MAX_STREAMS][DART_MAX_TTBR];
+ 
+@@ -549,10 +562,142 @@ apple_dart_t8110_hw_invalidate_tlb(struct apple_dart_stream_map *stream_map)
+ 		stream_map, DART_T8110_TLB_CMD_OP_FLUSH_SID);
+ }
+ 
++/* Only the explicitly identified Neo path selects the new fault ABI. */
++static int apple_dart_neo_configure_fault_abi(struct apple_dart *dart, u32 revision,
++					   resource_size_t mmio_size)
++{
++	if (revision == 0x100 || revision == 0x101 ||
++	    revision == 0x200 || revision == 0x201)
++		return 0;
++	if (revision < 0x202 || revision > 0x204)
++		return -EOPNOTSUPP;
++	if (!dart->num_streams || dart->num_streams > DART_MAX_STREAMS ||
++	    mmio_size < DART_T8110_V2_ERROR_RECORD +
++			DART_T8110_V2_ERROR_RECORD_STRIDE * dart->num_streams)
++		return -EINVAL;
++	/* A protected controller needs a separate page-table ownership contract. */
++	if (readl(dart->regs + DART_T8110_PROTECT) & DART_T8110_PROTECT_TTBR_TCR)
++		return -EOPNOTSUPP;
++
++	dart->neo_fault_v2 = true;
++	dart->neo_aux_status = revision >= 0x204 ? 0x4204 : 0x704;
++	dart->neo_aux_enable = revision >= 0x204 ? 0x4200 : 0x700;
++	return 0;
++}
++
++static void apple_dart_t8110_v2_mask_errors(struct apple_dart *dart)
++{
++	writel(U32_MAX, dart->regs + DART_T8110_V2_ERROR_MASK);
++	/* Auxiliary sources have opposite polarity and are not enabled here. */
++	writel(0, dart->regs + dart->neo_aux_enable);
++	readl(dart->regs + DART_T8110_V2_ERROR_MASK);
++}
++
++static int apple_dart_t8110_v2_pending(struct apple_dart *dart, u32 *pending)
++{
++	unsigned int words = BITS_TO_U32(dart->num_streams);
++
++	for (unsigned int i = 0; i < words; i++) {
++		u32 valid = U32_MAX;
++
++		if (i == words - 1 && dart->num_streams % 32)
++			valid = BIT(dart->num_streams % 32) - 1;
++		pending[i] = readl(dart->regs + DART_T8110_V2_ERROR_PENDING + 4 * i);
++		if (pending[i] & ~valid) {
++			dev_err(dart->dev, "Neo DART pending bits outside implemented SIDs: word %u=%08x\n",
++				i, pending[i]);
++			return -EINVAL;
++		}
++	}
++	return 0;
++}
++
++static int apple_dart_t8110_v2_ack_faults(struct apple_dart *dart,
++					const u32 *pending, bool clear_aux)
++{
++	unsigned int words = BITS_TO_U32(dart->num_streams);
++	unsigned long flags;
++	u32 value;
++	int ret = 0;
++
++	/* Serialize the unlock command against the ordinary TLB command path. */
++	spin_lock_irqsave(&dart->lock, flags);
++	for (unsigned int i = 0; i < words; i++)
++		if (pending[i])
++			writel(pending[i], dart->regs + DART_T8110_V2_ERROR_PENDING + 4 * i);
++	readl(dart->regs + DART_T8110_V2_ERROR_PENDING + 4 * (words - 1));
++	if (clear_aux) {
++		value = readl(dart->regs + dart->neo_aux_status);
++		writel(value, dart->regs + dart->neo_aux_status);
++		readl(dart->regs + dart->neo_aux_status);
++	}
++
++	if (readl(dart->regs + DART_T8110_V2_DIAG_LOCK) & DART_T8110_V2_LOCK_ON_ERR) {
++		ret = readl_poll_timeout_atomic(dart->regs + DART_T8110_TLB_CMD, value,
++					       !(value & DART_T8110_TLB_CMD_BUSY), 1,
++					       DART_STREAM_COMMAND_BUSY_TIMEOUT);
++		if (ret)
++			goto out;
++		writel(DART_T8110_V2_TLB_UNLOCK, dart->regs + DART_T8110_TLB_CMD);
++		ret = readl_poll_timeout_atomic(dart->regs + DART_T8110_TLB_CMD, value,
++					       !(value & DART_T8110_TLB_CMD_BUSY), 1,
++					       DART_STREAM_COMMAND_BUSY_TIMEOUT);
++	}
++out:
++	spin_unlock_irqrestore(&dart->lock, flags);
++	return ret;
++}
++
++static irqreturn_t apple_dart_t8110_v2_irq(int irq, void *dev)
++{
++	struct apple_dart *dart = dev;
++	u32 pending[BITS_TO_U32(DART_MAX_STREAMS)] = {};
++	bool handled = false;
++	int ret;
++
++	ret = apple_dart_t8110_v2_pending(dart, pending);
++	if (ret)
++		goto failed;
++	for (unsigned int word = 0; word < BITS_TO_U32(dart->num_streams); word++) {
++		for (unsigned int bit = 0; bit < 32; bit++) {
++			u32 sid = word * 32 + bit;
++			void __iomem *record;
++			u32 status, info, high, low;
++
++			if (!(pending[word] & BIT(bit)))
++				continue;
++			handled = true;
++			record = dart->regs + DART_T8110_V2_ERROR_RECORD +
++				 DART_T8110_V2_ERROR_RECORD_STRIDE * sid;
++			status = readl(record);
++			high = readl(record + 0xc);
++			low = readl(record + 0x8);
++			info = readl(record + 0x4);
++			dev_err_ratelimited(dart->dev,
++				"Neo DART fault: SID %u status=%08x info=%08x IOVA=%016llx\n",
++				sid, status, info, ((u64)high << 32) | low);
++		}
++	}
++	if (!handled)
++		return IRQ_NONE;
++	ret = apple_dart_t8110_v2_ack_faults(dart, pending, false);
++	if (ret)
++		goto failed;
++	return IRQ_HANDLED;
++failed:
++	apple_dart_t8110_v2_mask_errors(dart);
++	dev_err(dart->dev, "Neo DART fault recovery failed (%d); errors masked\n", ret);
++	return IRQ_HANDLED;
++}
++
+ static int apple_dart_hw_reset(struct apple_dart *dart)
+ {
+ 	struct apple_dart_stream_map stream_map;
+-	int i;
++	u32 pending[BITS_TO_U32(DART_MAX_STREAMS)] = {};
++	int i, ret;
++
++	if (dart->neo_fault_v2)
++		apple_dart_t8110_v2_mask_errors(dart);
+ 
+ 	stream_map.dart = dart;
+ 	bitmap_zero(stream_map.sidmap, DART_MAX_STREAMS);
+@@ -561,8 +706,30 @@ static int apple_dart_hw_reset(struct apple_dart *dart)
+ 	apple_dart_hw_clear_all_ttbrs(&stream_map);
+ 
+ 	/* enable all streams globally since TCR is used to control isolation */
+-	for (i = 0; i < BITS_TO_U32(dart->num_streams); i++)
+-		writel(U32_MAX, dart->regs + dart->hw->enable_streams + 4 * i);
++	for (i = 0; i < BITS_TO_U32(dart->num_streams); i++) {
++		u32 enable = U32_MAX;
++
++		if (dart->neo_fault_v2 && i == BITS_TO_U32(dart->num_streams) - 1 &&
++		    dart->num_streams % 32)
++			enable = BIT(dart->num_streams % 32) - 1;
++		writel(enable, dart->regs + dart->hw->enable_streams + 4 * i);
++	}
++
++	if (dart->neo_fault_v2) {
++		ret = apple_dart_t8110_v2_pending(dart, pending);
++		if (ret)
++			return ret;
++		ret = apple_dart_t8110_v2_ack_faults(dart, pending, true);
++		if (ret)
++			return ret;
++		ret = dart->hw->invalidate_tlb(&stream_map);
++		if (ret)
++			return ret;
++		/* Auxiliary sources stay disabled until their handling is supported. */
++		writel(0, dart->regs + DART_T8110_V2_ERROR_MASK);
++		readl(dart->regs + DART_T8110_V2_ERROR_MASK);
++		return 0;
++	}
+ 
+ 	/* clear any pending errors before the interrupt is unmasked */
+ 	writel(readl(dart->regs + dart->hw->error), dart->regs + dart->hw->error);
+@@ -1307,7 +1474,10 @@ static irqreturn_t apple_dart_irq(int irq, void *dev)
+ 	struct apple_dart *dart = dev;
+ 
+ 	WARN_ON(pm_runtime_get_sync(dart->dev) < 0);
+-	ret = dart->hw->irq_handler(irq, dev);
++	if (dart->neo_fault_v2)
++		ret = apple_dart_t8110_v2_irq(irq, dev);
++	else
++		ret = dart->hw->irq_handler(irq, dev);
+ 	pm_runtime_put(dart->dev);
+ 	return ret;
+ }
+@@ -1387,6 +1557,34 @@ static int apple_dart_probe(struct platform_device *pdev)
+ 		break;
+ 	}
+ 
++	if (of_device_is_compatible(dev->of_node, "apple,t8140-dart")) {
++		u32 revision = dart_params[2] & 0xffff;
++		unsigned int sid;
++
++		dev_info(dev, "Neo DART revision 0x%04x; PARAMS %08x %08x %08x %08x\n",
++			 revision, dart_params[0], dart_params[1], dart_params[2], dart_params[3]);
++		/* These SID registers retain their offsets in the captured macOS
++		 * driver. Record preboot state before reset changes remapping bits.
++		 */
++		for (sid = 0; sid < min(dart->num_streams, 4U); sid++)
++			dev_info(dev, "Neo DART preboot SID %u TCR=%08x TTBR=%08x\n", sid,
++				 readl(dart->regs + DART_T8110_TCR + 4 * sid),
++				 readl(dart->regs + DART_T8110_TTBR + 4 * sid));
++
++		dev_info(dev, "Neo DART raw PROTECT=%08x PROTECT_LOCK=%08x DIAG_LOCK=%08x\n",
++			 readl(dart->regs + DART_T8110_PROTECT),
++			 readl(dart->regs + DART_T8110_PROTECT_LOCK),
++			 readl(dart->regs + DART_T8110_V2_DIAG_LOCK));
++		ret = apple_dart_neo_configure_fault_abi(dart, revision, resource_size(res));
++		if (ret) {
++			dev_err(dev, "Neo DART revision 0x%04x unsupported or invalid/protected fault resources (%d); stopped before DART writes\n",
++				revision, ret);
++			goto err_clk_disable;
++		}
++		if (dart->neo_fault_v2)
++			dev_info(dev, "Neo per-SID fault ABI selected; auxiliary interrupts disabled\n");
++	}
++
+ 	dart->dma_min = 0;
+ 	dart->dma_max = DMA_BIT_MASK(dart->ias);
+ 
+@@ -1416,6 +1614,11 @@ static int apple_dart_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	dart->locked = apple_dart_is_locked(dart);
++	if (dart->neo_fault_v2 && dart->locked) {
++		dev_err(dev, "Neo per-SID fault path requires an unprotected controller\n");
++		ret = -EOPNOTSUPP;
++		goto err_clk_disable;
++	}
+ 	if (!dart->locked) {
+ 		ret = apple_dart_hw_reset(dart);
+ 		if (ret)
+@@ -1452,7 +1655,8 @@ static int apple_dart_probe(struct platform_device *pdev)
+ err_free_irq:
+ 	free_irq(dart->irq, dart);
+ err_clk_disable:
+-	pm_runtime_put(dev);
++	/* Probe failure may precede platform_set_drvdata: do not schedule PM callbacks. */
++	pm_runtime_put_noidle(dev);
+ 	clk_bulk_disable_unprepare(dart->num_clks, dart->clks);
+ 
+ 	return ret;
+diff --git a/drivers/mfd/macsmc.c b/drivers/mfd/macsmc.c
+index 31540f67ddbd8a6f4588d5afa7d8140ebaaeb2b4..d6dce12d40580e6b0c1a0cab4303a6fb1869f7e5 100644
+--- a/drivers/mfd/macsmc.c
++++ b/drivers/mfd/macsmc.c
+@@ -67,6 +67,15 @@ static int apple_smc_cmd_locked(struct apple_smc *smc, u64 cmd, u64 arg,
+ 		return -EIO;
+ 	if (smc->atomic_mode)
+ 		return -EIO;
++	if (smc->neo_trackpad) {
++		if (READ_ONCE(smc->neo_failed))
++			return -EIO;
++		if (!((cmd == SMC_MSG_GET_KEY_INFO && !size && !wsize &&
++		       (arg == SMC_KEY(pcIO) || arg == SMC_KEY(pmIP))) ||
++		      (cmd == SMC_MSG_WRITE_KEY && arg == SMC_KEY(pcIO) &&
++		       size == 8 && !wsize && smc->neo_power_command)))
++			return -EOPNOTSUPP;
++	}
+ 
+ 	reinit_completion(&smc->cmd_done);
+ 
+@@ -76,32 +85,49 @@ static int apple_smc_cmd_locked(struct apple_smc *smc, u64 cmd, u64 arg,
+ 	       FIELD_PREP(SMC_WSIZE, wsize) |
+ 	       FIELD_PREP(SMC_ID, smc->msg_id) |
+ 	       FIELD_PREP(SMC_DATA, arg));
++	if (smc->neo_trackpad)
++		WRITE_ONCE(smc->neo_cmd_pending, true);
+ 
+ 	ret = apple_rtkit_send_message(smc->rtk, SMC_ENDPOINT, msg, NULL, false);
+ 	if (ret) {
+ 		dev_err(smc->dev, "Failed to send command\n");
+-		return ret;
++		goto failed;
+ 	}
+ 
+ 	if (wait_for_completion_timeout(&smc->cmd_done, msecs_to_jiffies(SMC_TIMEOUT_MS)) <= 0) {
+ 		dev_err(smc->dev, "Command timed out (%llx)", msg);
+-		return -ETIMEDOUT;
++		ret = -ETIMEDOUT;
++		goto failed;
+ 	}
+ 
+ 	if (FIELD_GET(SMC_ID, smc->cmd_ret) != smc->msg_id) {
+ 		dev_err(smc->dev, "Command sequence mismatch (expected %d, got %d)\n",
+ 			smc->msg_id, (unsigned int)FIELD_GET(SMC_ID, smc->cmd_ret));
+-		return -EIO;
++		ret = -EIO;
++		goto failed;
++	}
++	if (smc->neo_trackpad && READ_ONCE(smc->neo_failed)) {
++		ret = -EIO;
++		goto failed;
+ 	}
+ 
+ 	result = FIELD_GET(SMC_RESULT, smc->cmd_ret);
+-	if (result)
+-		return -EIO;
++	if (result) {
++		ret = smc->neo_trackpad && result == 0x84 ? -ENOENT : -EIO;
++		goto failed;
++	}
+ 
+ 	if (ret_data)
+ 		*ret_data = FIELD_GET(SMC_DATA, smc->cmd_ret);
+ 
+ 	return FIELD_GET(SMC_SIZE, smc->cmd_ret);
++
++failed:
++	if (smc->neo_trackpad) {
++		WRITE_ONCE(smc->neo_failed, true);
++		WRITE_ONCE(smc->neo_cmd_pending, false);
++	}
++	return ret;
+ }
+ 
+ static int apple_smc_cmd(struct apple_smc *smc, u64 cmd, u64 arg,
+@@ -122,6 +148,8 @@ static int apple_smc_rw_locked(struct apple_smc *smc, smc_key key,
+ 	u64 cmd;
+ 
+ 	lockdep_assert_held(&smc->mutex);
++	if (smc->neo_trackpad)
++		return -EOPNOTSUPP;
+ 
+ 	if (rsize > SMC_MAX_SIZE)
+ 		return -EINVAL;
+@@ -210,6 +238,8 @@ int apple_smc_get_key_info(struct apple_smc *smc, smc_key key, struct apple_smc_
+ {
+ 	u8 key_info[6];
+ 	int ret;
++	if (smc->neo_trackpad)
++		return -EOPNOTSUPP;
+ 
+ 	ret = apple_smc_cmd(smc, SMC_MSG_GET_KEY_INFO, key, 0, 0, NULL);
+ 	if (ret >= 0 && info) {
+@@ -225,6 +255,8 @@ EXPORT_SYMBOL(apple_smc_get_key_info);
+ int apple_smc_enter_atomic(struct apple_smc *smc)
+ {
+ 	guard(mutex)(&smc->mutex);
++	if (smc->neo_trackpad)
++		return -EOPNOTSUPP;
+ 
+ 	/*
+ 	 * Disable notifications since this is called before shutdown and no
+@@ -247,6 +279,8 @@ EXPORT_SYMBOL(apple_smc_enter_atomic);
+ int apple_smc_write_atomic(struct apple_smc *smc, smc_key key, const void *buf, size_t size)
+ {
+ 	guard(spinlock_irqsave)(&smc->lock);
++	if (smc->neo_trackpad)
++		return -EOPNOTSUPP;
+ 	u8 result;
+ 	int ret;
+ 	u64 msg;
+@@ -301,6 +335,11 @@ static void apple_smc_rtkit_crashed(void *cookie, const void *bfr, size_t bfr_le
+ 	struct apple_smc *smc = cookie;
+ 
+ 	smc->boot_stage = APPLE_SMC_ERROR_CRASHED;
++	if (smc->neo_trackpad) {
++		WRITE_ONCE(smc->neo_failed, true);
++		complete(&smc->cmd_done);
++		complete(&smc->init_done);
++	}
+ 	dev_err(smc->dev, "SMC crashed! Your system will reboot in a few seconds...\n");
+ }
+ 
+@@ -308,6 +347,8 @@ static int apple_smc_rtkit_shmem_setup(void *cookie, struct apple_rtkit_shmem *b
+ {
+ 	struct apple_smc *smc = cookie;
+ 	size_t bfr_end;
++	if (smc->neo_trackpad && !bfr->size)
++		return -EINVAL;
+ 
+ 	if (!bfr->iova) {
+ 		dev_err(smc->dev, "RTKit wants a RAM buffer\n");
+@@ -343,6 +384,11 @@ static bool apple_smc_rtkit_recv_early(void *cookie, u8 endpoint, u64 message)
+ 	if (smc->boot_stage == APPLE_SMC_BOOTING) {
+ 		int ret;
+ 
++		if (smc->neo_trackpad && !READ_ONCE(smc->neo_init_pending))
++			return true;
++		if (smc->neo_trackpad)
++			WRITE_ONCE(smc->neo_init_pending, false);
++
+ 		smc->shmem.iova = message;
+ 		smc->shmem.size = SMC_SHMEM_SIZE;
+ 		ret = apple_smc_rtkit_shmem_setup(smc, &smc->shmem);
+@@ -357,6 +403,13 @@ static bool apple_smc_rtkit_recv_early(void *cookie, u8 endpoint, u64 message)
+ 		/* Handle these in the RTKit worker thread */
+ 		return false;
+ 	} else {
++		if (smc->neo_trackpad) {
++			if (!READ_ONCE(smc->neo_cmd_pending) || READ_ONCE(smc->neo_failed))
++				return true;
++			WRITE_ONCE(smc->neo_cmd_pending, false);
++			if (FIELD_GET(SMC_ID, message) != smc->msg_id)
++				WRITE_ONCE(smc->neo_failed, true);
++		}
+ 		smc->cmd_ret = message;
+ 		if (smc->atomic_pending)
+ 			smc->atomic_pending = false;
+@@ -407,6 +460,203 @@ static void apple_smc_disable_notifications(void *data)
+ 	apple_smc_write_flag(smc, SMC_KEY(NTAP), false);
+ }
+ 
++static int apple_smc_neo_metadata_locked(struct apple_smc *smc)
++{
++	static const struct {
++		smc_key key;
++		u8 size;
++		u32 type;
++		u8 flags;
++	} expected[] = {
++		{ SMC_KEY(pcIO), 8, _SMC_KEY("hex_"), 0xf0 },
++		{ SMC_KEY(pmIP), 1, _SMC_KEY("flag"), 0x50 },
++	};
++	u8 info[6];
++	unsigned int i;
++	int ret;
++
++	lockdep_assert_held(&smc->mutex);
++	for (i = 0; i < ARRAY_SIZE(expected); i++) {
++		ret = apple_smc_cmd_locked(smc, SMC_MSG_GET_KEY_INFO,
++					   expected[i].key, 0, 0, NULL);
++		if (ret < 0)
++			return ret;
++		memcpy_fromio(info, smc->shmem.iomem, sizeof(info));
++		if (info[0] != expected[i].size ||
++		    get_unaligned_be32(info + 1) != expected[i].type ||
++		    info[5] != expected[i].flags) {
++			dev_err(smc->dev, "Neo SMC metadata mismatch for key 0x%08x\n",
++				expected[i].key);
++			WRITE_ONCE(smc->neo_failed, true);
++			return -ENODEV;
++		}
++	}
++	return 0;
++}
++
++int apple_smc_neo_trackpad_power(struct apple_smc *smc, bool on)
++{
++	/* Exact J700 pKW8 pcIO template; only the low 16-bit scalar changes. */
++	u8 payload[8] = { on ? 0 : 1, 0, 1, 0, 0, 0, 0x13, 0 };
++	int ret;
++
++	if (!smc || !smc->neo_trackpad)
++		return -ENODEV;
++	guard(mutex)(&smc->mutex);
++	if (!smc->neo_metadata_ready || READ_ONCE(smc->neo_failed) ||
++	    smc->boot_stage != APPLE_SMC_INITIALIZED)
++		return -ENODEV;
++	/* One OFF then one ON per boot; callers cannot repeatedly cycle power. */
++	if (smc->neo_power_step != (on ? 1 : 0))
++		return -EALREADY;
++	ret = apple_smc_neo_metadata_locked(smc);
++	if (ret)
++		return ret;
++	memcpy_toio(smc->shmem.iomem, payload, sizeof(payload));
++	smc->neo_power_command = true;
++	ret = apple_smc_cmd_locked(smc, SMC_MSG_WRITE_KEY, SMC_KEY(pcIO),
++				   sizeof(payload), 0, NULL);
++	smc->neo_power_command = false;
++	/* AppleSMC _writeMsg checks status only; WRITE ACKs need not echo length. */
++	if (ret < 0) {
++		WRITE_ONCE(smc->neo_failed, true);
++		return ret;
++	}
++	smc->neo_power_step++;
++	/* The active disable sequence waits 50 ms after the acknowledged write. */
++	if (!on)
++		msleep(50);
++	dev_info(smc->dev, "Neo trackpad power %s acknowledged\n", on ? "on" : "off");
++	return 0;
++}
++EXPORT_SYMBOL_GPL(apple_smc_neo_trackpad_power);
++
++struct apple_smc *devm_apple_smc_neo_trackpad_get(struct device *consumer,
++					       struct device_node *trackpad)
++{
++	struct platform_device *pdev;
++	struct device_node *node;
++	struct apple_smc *smc;
++
++	if (!consumer || !trackpad || trackpad->parent != consumer->of_node ||
++	    !of_node_name_eq(trackpad, "multi-touch") ||
++	    !of_device_is_available(trackpad) ||
++	    !of_device_is_compatible(consumer->of_node, "apple,t8140-dockchannel-hid"))
++		return ERR_PTR(-ENODEV);
++	node = of_parse_phandle(trackpad, "apple,smc", 0);
++	if (!node)
++		return ERR_PTR(-ENODEV);
++	if (!of_device_is_compatible(node, "apple,t8140-smc") ||
++	    !of_device_is_available(node)) {
++		of_node_put(node);
++		return ERR_PTR(-ENODEV);
++	}
++	pdev = of_find_device_by_node(node);
++	of_node_put(node);
++	if (!pdev)
++		return ERR_PTR(-EPROBE_DEFER);
++	device_lock(&pdev->dev);
++	smc = dev_get_drvdata(&pdev->dev);
++	if (!device_is_bound(&pdev->dev) || !smc) {
++		smc = ERR_PTR(-EPROBE_DEFER);
++	} else if (!smc->neo_trackpad || !smc->neo_metadata_ready ||
++		   READ_ONCE(smc->neo_failed)) {
++		smc = ERR_PTR(-ENODEV);
++	} else if (!device_link_add(consumer, &pdev->dev, DL_FLAG_AUTOREMOVE_CONSUMER)) {
++		smc = ERR_PTR(-ENOMEM);
++	}
++	device_unlock(&pdev->dev);
++	/* The managed device link owns supplier/consumer references on success. */
++	put_device(&pdev->dev);
++	return smc;
++}
++EXPORT_SYMBOL_GPL(devm_apple_smc_neo_trackpad_get);
++
++static int apple_smc_neo_validate(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	struct resource *asc, *sram;
++	struct property *prop;
++
++	prop = of_find_property(np, "apple,neo-trackpad-power", NULL);
++	if (!of_device_is_compatible(np, "apple,t8140-smc") ||
++	    !prop || prop->length || of_get_child_count(np) ||
++	    of_property_count_strings(np, "compatible") != 1)
++		return -EINVAL;
++	asc = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	sram = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	if (!asc || !sram || platform_get_resource(pdev, IORESOURCE_MEM, 2) ||
++	    asc->start != 0x30c600000ULL || resource_size(asc) != 0x4000 ||
++	    sram->start != 0x30de00000ULL || resource_size(sram) != 0x100000)
++		return -EINVAL;
++	return 0;
++}
++
++static int apple_smc_neo_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct apple_smc *smc;
++	int ret;
++
++	ret = apple_smc_neo_validate(pdev);
++	if (ret)
++		return dev_err_probe(dev, ret, "Invalid Neo trackpad SMC resources or opt-in\n");
++	smc = devm_kzalloc(dev, sizeof(*smc), GFP_KERNEL);
++	if (!smc)
++		return -ENOMEM;
++	smc->dev = dev;
++	smc->neo_trackpad = true;
++	smc->boot_stage = APPLE_SMC_BOOTING;
++	mutex_init(&smc->mutex);
++	spin_lock_init(&smc->lock);
++	init_completion(&smc->init_done);
++	init_completion(&smc->cmd_done);
++	BLOCKING_INIT_NOTIFIER_HEAD(&smc->event_handlers);
++	smc->sram_base = devm_platform_get_and_ioremap_resource(pdev, 1, &smc->sram);
++	if (IS_ERR(smc->sram_base))
++		return dev_err_probe(dev, PTR_ERR(smc->sram_base), "Failed to map Neo SMC SRAM\n");
++	smc->rtk = devm_apple_rtkit_init(dev, smc, NULL, 0, &apple_smc_rtkit_ops);
++	if (IS_ERR(smc->rtk))
++		return dev_err_probe(dev, PTR_ERR(smc->rtk), "Failed to initialize Neo SMC RTKit\n");
++	dev_set_drvdata(dev, smc);
++	ret = apple_rtkit_wake(smc->rtk);
++	if (ret)
++		goto unavailable;
++	ret = apple_rtkit_start_ep(smc->rtk, SMC_ENDPOINT);
++	if (ret)
++		goto unavailable;
++	WRITE_ONCE(smc->neo_init_pending, true);
++	ret = apple_rtkit_send_message(smc->rtk, SMC_ENDPOINT, SMC_MSG_INITIALIZE,
++				       NULL, false);
++	if (ret)
++		goto unavailable;
++	if (!wait_for_completion_timeout(&smc->init_done, msecs_to_jiffies(SMC_TIMEOUT_MS))) {
++		ret = -ETIMEDOUT;
++		goto unavailable;
++	}
++	if (smc->boot_stage != APPLE_SMC_INITIALIZED || READ_ONCE(smc->neo_failed)) {
++		ret = -EIO;
++		goto unavailable;
++	}
++	mutex_lock(&smc->mutex);
++	ret = apple_smc_neo_metadata_locked(smc);
++	mutex_unlock(&smc->mutex);
++	if (ret)
++		goto unavailable;
++	smc->neo_metadata_ready = true;
++	dev_info(dev, "Neo SMC metadata verified: pcIO 8/hex_/f0, pmIP 1/flag/50; no power write yet\n");
++	/* ADT no-shutdown=1: never add the ordinary quiesce or NTAP actions. */
++	return 0;
++
++unavailable:
++	WRITE_ONCE(smc->neo_failed, true);
++	WRITE_ONCE(smc->neo_init_pending, false);
++	WRITE_ONCE(smc->neo_cmd_pending, false);
++	/* Keep servicing RTKit with SRAM alive; do not restart or quiesce SMC. */
++	dev_err(dev, "Neo SMC unavailable (%d); trackpad power disabled\n", ret);
++	return 0;
++}
++
+ static int apple_smc_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -414,6 +664,9 @@ static int apple_smc_probe(struct platform_device *pdev)
+ 	__be32 count;
+ 	int ret;
+ 
++	if (of_device_is_compatible(dev->of_node, "apple,t8140-smc"))
++		return apple_smc_neo_probe(pdev);
++
+ 	smc = devm_kzalloc(dev, sizeof(*smc), GFP_KERNEL);
+ 	if (!smc)
+ 		return -ENOMEM;
+@@ -486,6 +739,7 @@ static int apple_smc_probe(struct platform_device *pdev)
+ }
+ 
+ static const struct of_device_id apple_smc_of_match[] = {
++	{ .compatible = "apple,t8140-smc" },
+ 	{ .compatible = "apple,t8103-smc" },
+ 	{ .compatible = "apple,smc" },
+ 	{},
+@@ -496,6 +750,8 @@ static struct platform_driver apple_smc_driver = {
+ 	.driver = {
+ 		.name = "macsmc",
+ 		.of_match_table = apple_smc_of_match,
++		/* The built-in Neo experiment retains an active firmware endpoint. */
++		.suppress_bind_attrs = true,
+ 	},
+ 	.probe = apple_smc_probe,
+ };
+diff --git a/drivers/soc/apple/rtkit-helper.c b/drivers/soc/apple/rtkit-helper.c
+index 080d083ed9bd2f30648e9778edad4abbb1e3ab04..c0b82199a2ac21fee3b08eb7da54c12abb937cf2 100644
+--- a/drivers/soc/apple/rtkit-helper.c
++++ b/drivers/soc/apple/rtkit-helper.c
+@@ -10,11 +10,19 @@
+ #include <linux/ioport.h>
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
++#include <linux/of_reserved_mem.h>
++#include <linux/mm.h>
+ #include <linux/platform_device.h>
+ #include <linux/soc/apple/rtkit.h>
+ 
+ #define APPLE_ASC_CPU_CONTROL		0x44
+ #define APPLE_ASC_CPU_CONTROL_RUN	BIT(4)
++#define APPLE_MTP_MAX_MEMORY_REGIONS	16
++
++struct apple_rtkit_helper_memory {
++	struct resource res;
++	void __iomem *base;
++};
+ 
+ struct apple_rtkit_helper {
+ 	struct device *dev;
+@@ -24,6 +32,9 @@ struct apple_rtkit_helper {
+ 
+ 	struct resource *sram;
+ 	void __iomem *sram_base;
++
++	unsigned int nr_memory;
++	struct apple_rtkit_helper_memory memory[APPLE_MTP_MAX_MEMORY_REGIONS];
+ };
+ 
+ static int apple_rtkit_helper_shmem_setup(void *cookie, struct apple_rtkit_shmem *bfr)
+@@ -35,6 +46,9 @@ static int apple_rtkit_helper_shmem_setup(void *cookie, struct apple_rtkit_shmem
+ 		.name = "rtkit_map",
+ 	};
+ 
++	if (!bfr->size)
++		return -EINVAL;
++
+ 	if (!bfr->iova) {
+ 		bfr->buffer = dma_alloc_coherent(helper->dev, bfr->size,
+ 						    &bfr->iova, GFP_KERNEL);
+@@ -43,24 +57,34 @@ static int apple_rtkit_helper_shmem_setup(void *cookie, struct apple_rtkit_shmem
+ 		return 0;
+ 	}
+ 
+-	if (!helper->sram) {
+-		dev_err(helper->dev,
+-			"RTKit buffer request with no SRAM region: %pR", &res);
+-		return -EFAULT;
++	/* Only physical addresses already named in the SRAM resource or the
++	 * Neo's boot-time reserved-memory allowlist may be mapped. In particular,
++	 * neither a tagged IOVA nor an IOP virtual address is a physical address.
++	 */
++	if (res.end < res.start)
++		return -EINVAL;
++
++	res.flags = IORESOURCE_MEM;
++	if (helper->sram && resource_contains(helper->sram, &res)) {
++		bfr->iomem = helper->sram_base + (res.start - helper->sram->start);
++		bfr->is_mapped = true;
++		return 0;
+ 	}
+ 
+-	res.flags = helper->sram->flags;
++	for (unsigned int i = 0; i < helper->nr_memory; i++) {
++		struct apple_rtkit_helper_memory *mem = &helper->memory[i];
+ 
+-	if (res.end < res.start || !resource_contains(helper->sram, &res)) {
+-		dev_err(helper->dev,
+-			"RTKit buffer request outside SRAM region: %pR", &res);
+-		return -EFAULT;
++		if (!resource_contains(&mem->res, &res))
++			continue;
++		bfr->iomem = mem->base + (res.start - mem->res.start);
++		bfr->is_mapped = true;
++		dev_info(helper->dev, "RTKit buffer within preserved firmware DRAM: %pR\n",
++			 &res);
++		return 0;
+ 	}
+ 
+-	bfr->iomem = helper->sram_base + (res.start - helper->sram->start);
+-	bfr->is_mapped = true;
+-
+-	return 0;
++	dev_err(helper->dev, "RTKit buffer outside permitted firmware memory: %pR\n", &res);
++	return -EFAULT;
+ }
+ 
+ static void apple_rtkit_helper_shmem_destroy(void *cookie, struct apple_rtkit_shmem *bfr)
+@@ -73,6 +97,63 @@ static const struct apple_rtkit_ops apple_rtkit_helper_ops = {
+ 	.shmem_destroy = apple_rtkit_helper_shmem_destroy,
+ };
+ 
++/* The bootloader supplies these regions from this boot's ADT segment-ranges.
++ * no-map prevents a conflicting WB linear mapping; arm64 ioremap_wc uses Normal
++ * Non-Cacheable memory, suitable for coprocessor-owned DRAM buffers.
++ * This maps CPU access only. It intentionally installs no DART translations.
++ */
++static int apple_rtkit_helper_map_neo_memory(struct apple_rtkit_helper *helper)
++{
++	struct device *dev = helper->dev;
++	int count;
++
++	if (!of_property_read_bool(dev->of_node, "apple,mtp-preserve-firmware"))
++		return dev_err_probe(dev, -EINVAL, "Missing Neo firmware preservation opt-in\n");
++
++	count = of_property_count_u32_elems(dev->of_node, "memory-region");
++	if (count < 1 || count > APPLE_MTP_MAX_MEMORY_REGIONS)
++		return dev_err_probe(dev, -EINVAL, "Invalid Neo firmware memory-region count\n");
++
++	for (int i = 0; i < count; i++) {
++		struct apple_rtkit_helper_memory *mem = &helper->memory[i];
++		struct device_node *np = of_parse_phandle(dev->of_node, "memory-region", i);
++		struct reserved_mem *rmem;
++		bool permitted;
++
++		if (!np)
++			return dev_err_probe(dev, -EINVAL, "Invalid Neo firmware memory phandle\n");
++		permitted = of_device_is_available(np) &&
++			of_device_is_compatible(np, "apple,asc-mem") &&
++			of_property_read_bool(np, "no-map") &&
++			!of_property_read_bool(np, "reusable") &&
++			!of_property_present(np, "iommu-addresses");
++		rmem = of_reserved_mem_lookup(np);
++		of_node_put(np);
++		if (!permitted || !rmem || !rmem->size ||
++		    rmem->base + rmem->size - 1 < rmem->base ||
++		    !IS_ALIGNED(rmem->base, PAGE_SIZE) ||
++		    !IS_ALIGNED(rmem->size, PAGE_SIZE))
++			return dev_err_probe(dev, -EINVAL, "Unreserved or invalid Neo firmware memory\n");
++
++		mem->res.start = rmem->base;
++		mem->res.end = rmem->base + rmem->size - 1;
++		mem->res.flags = IORESOURCE_MEM;
++		mem->res.name = "mtp-firmware";
++		for (int j = 0; j < i; j++)
++			if (mem->res.start <= helper->memory[j].res.end &&
++			    mem->res.end >= helper->memory[j].res.start)
++				return dev_err_probe(dev, -EINVAL, "Overlapping Neo firmware regions\n");
++
++		mem->base = devm_ioremap_wc(dev, rmem->base, rmem->size);
++		if (!mem->base)
++			return dev_err_probe(dev, -ENOMEM, "Failed to map Neo firmware DRAM\n");
++		helper->nr_memory++;
++		dev_info(dev, "Preserved firmware DRAM allowlist: %pR\n", &mem->res);
++	}
++
++	return 0;
++}
++
+ static int apple_rtkit_helper_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -91,6 +172,12 @@ static int apple_rtkit_helper_probe(struct platform_device *pdev)
+ 	helper->dev = dev;
+ 	platform_set_drvdata(pdev, helper);
+ 
++	if (of_device_is_compatible(dev->of_node, "apple,t8140-mtp")) {
++		ret = apple_rtkit_helper_map_neo_memory(helper);
++		if (ret)
++			return ret;
++	}
++
+ 	helper->asc_base = devm_platform_ioremap_resource_byname(pdev, "asc");
+ 	if (IS_ERR(helper->asc_base))
+ 		return PTR_ERR(helper->asc_base);
+@@ -131,6 +218,7 @@ static void apple_rtkit_helper_remove(struct platform_device *pdev)
+ }
+ 
+ static const struct of_device_id apple_rtkit_helper_of_match[] = {
++	{ .compatible = "apple,t8140-mtp" },
+ 	{ .compatible = "apple,rtk-helper-asc4" },
+ 	{},
+ };
+diff --git a/include/linux/mfd/macsmc.h b/include/linux/mfd/macsmc.h
+index cc09ecce0df7424b288d4248d869f4c9bed3e188..1df3c77f2e27cd3d325db1ce9c172f2c8947c9a4 100644
+--- a/include/linux/mfd/macsmc.h
++++ b/include/linux/mfd/macsmc.h
+@@ -9,6 +9,8 @@
+ #define _LINUX_MFD_MACSMC_H
+ 
+ #include <linux/soc/apple/rtkit.h>
++#include <linux/err.h>
++#include <linux/kconfig.h>
+ 
+ /**
+  * typedef smc_key - Alias for u32 to be used for SMC keys
+@@ -128,8 +130,34 @@ struct apple_smc {
+ 
+ 	struct mutex mutex;
+ 	spinlock_t lock;
++
++	/* Explicit J700 trackpad provider; never exposes the normal MFD children. */
++	bool neo_trackpad;
++	bool neo_metadata_ready;
++	bool neo_failed;
++	bool neo_init_pending;
++	bool neo_cmd_pending;
++	bool neo_power_command;
++	u8 neo_power_step;
+ };
+ 
++struct device_node;
++#if IS_REACHABLE(CONFIG_MFD_MACSMC)
++struct apple_smc *devm_apple_smc_neo_trackpad_get(struct device *consumer,
++					       struct device_node *trackpad);
++int apple_smc_neo_trackpad_power(struct apple_smc *smc, bool on);
++#else
++static inline struct apple_smc *
++devm_apple_smc_neo_trackpad_get(struct device *consumer, struct device_node *trackpad)
++{
++	return ERR_PTR(-ENODEV);
++}
++static inline int apple_smc_neo_trackpad_power(struct apple_smc *smc, bool on)
++{
++	return -ENODEV;
++}
++#endif
++
+ /**
+  * apple_smc_read - Read size bytes from given SMC key into buf
+  * @smc: Pointer to apple_smc struct
+diff --git a/scripts/mod/Makefile b/scripts/mod/Makefile
+index c729bc936bae14535798503b94e25b3f09188f56..40899bb14abae6a2437a5908a2153638e242e27c 100644
+--- a/scripts/mod/Makefile
++++ b/scripts/mod/Makefile
+@@ -6,6 +6,13 @@ always-y		+= empty.o
+ 
+ modpost-objs	:= modpost.o file2alias.o sumversion.o symsearch.o
+ 
++# VLinux: macOS host build — Darwin's sys/_types/_uuid_t.h typedefs uuid_t as
++# unsigned char[16], colliding with the kernel's struct uuid_t in file2alias.c.
++# Defining _UUID_T suppresses the Darwin typedef for this file only.
++ifeq ($(shell uname -s),Darwin)
++HOSTCFLAGS_file2alias.o += -D_UUID_T
++endif
++
+ devicetable-offsets-file := devicetable-offsets.h
+ 
+ $(obj)/$(devicetable-offsets-file): $(obj)/devicetable-offsets.s FORCE
+diff --git a/usr/Makefile b/usr/Makefile
+index e8f42478a0b76540180d191042cd58d3e4381f19..c723cd2d14b01b0070aa9335f8f6f37231d46b11 100644
+--- a/usr/Makefile
++++ b/usr/Makefile
+@@ -83,3 +83,8 @@ $(obj)/initramfs_inc_data: $(cpio-data) FORCE
+ targets += initramfs_data.cpio initramfs_inc_data
+ 
+ subdir-$(CONFIG_UAPI_HEADER_TEST) += include
++
++# VLinux: Darwin-only host compat; keep Linux builds and relocated trees usable.
++ifeq ($(shell uname -s),Darwin)
++HOSTCFLAGS_gen_init_cpio.o += -include $(srctree)/.host_include/vlinux_cpio_compat.h
++endif

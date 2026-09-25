@@ -1,6 +1,30 @@
 # Build outputs
 /build/
 /out/
+/src/
+/dist/
+/cache/
+/downloads/
+/research/
+/.local/
+__pycache__/
+*.pyc
+*.o
+*.a
+*.elf
+*.bin
+*.img
+*.qcow2
+*.dmg
+*.ipsw
+*.img4
+*.im4p
+*.heic
+*.HEIC
+.env
+.env.*
+*.pem
+*.key
 
 # Editor / OS noise
 *.swp

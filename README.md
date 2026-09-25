@@ -1,39 +1,53 @@
-# VLinux | Linux on MacBook Neo
+# VLinux | Arch Linux on MacBook Neo
 
-A WIP beta to get Arch Linux running on a MacBook Neo.
+<img src="assets/branding/vlinux-logo.png" alt="VLinux" width="220">
 
-> **Status: coming soon.** The kernel source and build tooling haven't been
-> published yet. This repo holds the project overview for now. See
-> [docs/HARDWARE.md](docs/HARDWARE.md) for what's being worked on.
+Experimental native Linux bring-up for **MacBook Neo / J700 / A18 Pro (t8140)**,
+based on m1n1 and the Asahi Linux kernel with Arch Linux ARM and KDE Plasma.
 
-## What is VLinux?
+**Native Arch/KDE, the built-in keyboard, and trackpad scrolling/gestures have
+been reported working. Internal SSD access and networking are still in development.**
+The desktop currently boots from a RAM filesystem and does not persist changes.
 
-VLinux is a custom Linux kernel for the MacBook Neo. It builds on the
-[Asahi Linux](https://asahilinux.org) work for Apple silicon and boots an
-[Arch Linux ARM](https://archlinuxarm.org) (aarch64) userspace.
+The current SSD diagnostic has reached RTKit service discovery and photographed
+a 32 KiB crashlog buffer request. The next shared-buffer/SART test is prepared;
+its native result is pending. See [hardware status](docs/HARDWARE.md) and
+[the SSD work](docs/SSD.md) for the distinction between native and automated evidence.
 
-Planned components:
+## Source and tools
 
-- **Kernel:** Apple silicon kernel tree plus MacBook Neo patches and a
-  tuned config (16K pages, Apple SoC drivers)
-- **Device trees:** hardware description for the MacBook Neo
-- **Boot chain:** m1n1 → U-Boot → EFI bootloader → Linux
-- **Root filesystem:** Arch Linux ARM image with the VLinux kernel and
-  modules preinstalled
+This repository contains pinned, hash-checked patch sets for m1n1 and the Linux
+kernel, the native kernel configuration and device-tree overlays, a host fault
+test, hardware inventory tools, and the Test Center UI. Upstream sources are
+fetched into an ignored `src/` directory:
+
+```sh
+python3 scripts/prepare-sources.py --component m1n1
+python3 scripts/ssd/test-buffers.py --output build/ssd-buffers-check
+```
+
+The source preparation command refuses to overwrite an existing checkout that
+has different contents. See [development](docs/DEVELOPMENT.md) for dependencies,
+Linux source preparation, tests and build limitations.
+
+This is a development source release, not an installer or a downloadable boot
+image. The locally tested boot packages depend on private build artifacts and
+firmware obtained from the machine's own macOS installation; those are not
+included here. The source preparation and host test commands do not enroll a
+kernel, reboot a machine, or issue native SSD-controller commands.
 
 ## Documentation
 
-- [Architecture](docs/ARCHITECTURE.md): boot chain and planned layout
-- [Hardware support](docs/HARDWARE.md): per-component status
+- [Architecture](docs/ARCHITECTURE.md)
+- [Hardware support](docs/HARDWARE.md)
+- [SSD bring-up](docs/SSD.md)
+- [Development and validation](docs/DEVELOPMENT.md)
+- [Source provenance and licenses](docs/SOURCES.md)
 - [Contributing](CONTRIBUTING.md)
 
-## Disclaimer
-
-This is experimental low-level software. Changing your Mac's boot security
-settings and installing a third-party kernel can leave it unbootable until
-it is restored from a second Mac via DFU. Back up your data first.
-
-VLinux is not affiliated with Apple, Asahi Linux or Arch Linux ARM.
+VLinux is experimental. Keep a working macOS installation and a known-good boot
+fallback when testing hardware changes. VLinux is not affiliated with Apple,
+Asahi Linux or Arch Linux ARM.
 
 ## AI disclosure
 
@@ -45,5 +59,7 @@ and the kernel's conventions.
 
 ## License
 
-[Apache License 2.0](LICENSE). Kernel patches and device trees will be
-GPL-2.0, the same license as the Linux kernel.
+Project tooling and documentation use the existing [Apache License 2.0](LICENSE),
+unless a file says otherwise. m1n1 patches retain its MIT license; Linux patches
+retain their upstream GPL/SPDX terms, including dual-licensed device trees.
+See [source provenance](docs/SOURCES.md) and `LICENSES/`.
