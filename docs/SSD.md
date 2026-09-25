@@ -66,3 +66,14 @@ emulation. Its matching systemd, headless Plasma and graphical desktop/input VM
 checks pass, including all five report pages. It is staged locally for the next
 native test. VMs do not execute the Neo's m1n1/SART/mailbox path, so those results do
 not replace the next physical test.
+
+## Upstream comparison
+
+On 2026-09-25, the NVMe and RTKit files in this checkout were compared with
+official m1n1 `main` at `4184923ffb2dff079b384d6a32cc02142aa14572` and Linux
+`asahi-wip` at `94fb23346d522edf53722357c426a3e58030beea`. All four files match
+byte-for-byte. m1n1 already includes the M4 split NVMMU/NVMe resource handling
+and additional I/O-queue address writes. This check found no newer change in
+those files to import before the native buffer test; it does not rule out work
+on other developer branches. Exact source links and hashes are in the
+[comparison receipt](evidence/upstream-comparison-20260925.json).

@@ -34,6 +34,8 @@ The [network investigation](NETWORK.md) resolves the conflicting Broadcom device
 tree text against enumerated PCI IDs and installed Sunrise driver metadata.
 The [diagnostics desktop](DIAGNOSTICS.md) adds a batch report for power, thermal,
 backlight, USB and graphics interfaces without adding hardware drivers.
+The [graphics investigation](GRAPHICS.md) records the active macOS G17P driver
+and the missing kernel/firmware/userspace work for native acceleration.
 
 ## Battery and SMC scope
 

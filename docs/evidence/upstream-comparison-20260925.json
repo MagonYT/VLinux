@@ -1,0 +1,78 @@
+{
+  "checked_at": "2026-09-25T02:48:21.511095+00:00",
+  "files": [
+    {
+      "repository": "linux",
+      "revision": "94fb23346d522edf53722357c426a3e58030beea",
+      "path": "drivers/nvme/host/apple.c",
+      "url": "https://raw.githubusercontent.com/AsahiLinux/linux/94fb23346d522edf53722357c426a3e58030beea/drivers/nvme/host/apple.c",
+      "sha256": "95f9a0fe75f62eb1532648f1d47b7c84a77030e5d451bf64b2424f6f605942ab",
+      "local_sha256": "95f9a0fe75f62eb1532648f1d47b7c84a77030e5d451bf64b2424f6f605942ab",
+      "identical": true
+    },
+    {
+      "repository": "linux",
+      "revision": "94fb23346d522edf53722357c426a3e58030beea",
+      "path": "drivers/soc/apple/rtkit.c",
+      "url": "https://raw.githubusercontent.com/AsahiLinux/linux/94fb23346d522edf53722357c426a3e58030beea/drivers/soc/apple/rtkit.c",
+      "sha256": "c8683d97c9b8a2690c39a07db805637695c9c869353a1923bd44e92c523949ba",
+      "local_sha256": "c8683d97c9b8a2690c39a07db805637695c9c869353a1923bd44e92c523949ba",
+      "identical": true
+    },
+    {
+      "repository": "linux",
+      "revision": "94fb23346d522edf53722357c426a3e58030beea",
+      "path": "drivers/gpu/drm/asahi/hw/mod.rs",
+      "url": "https://raw.githubusercontent.com/AsahiLinux/linux/94fb23346d522edf53722357c426a3e58030beea/drivers/gpu/drm/asahi/hw/mod.rs",
+      "sha256": "a95fceff7e41563a7aa0b2365c6e39488e2d4f828c0a20bc2b888b0cb4b1185f",
+      "local_sha256": "a95fceff7e41563a7aa0b2365c6e39488e2d4f828c0a20bc2b888b0cb4b1185f",
+      "identical": true
+    },
+    {
+      "repository": "linux",
+      "revision": "94fb23346d522edf53722357c426a3e58030beea",
+      "path": "arch/arm64/boot/dts/apple/t8132.dtsi",
+      "url": "https://raw.githubusercontent.com/AsahiLinux/linux/94fb23346d522edf53722357c426a3e58030beea/arch/arm64/boot/dts/apple/t8132.dtsi",
+      "sha256": "4bcfc07b11c957a5525ddb4606559cd481525365baf9c4f84694d144966bf0bf",
+      "local_sha256": "4bcfc07b11c957a5525ddb4606559cd481525365baf9c4f84694d144966bf0bf",
+      "identical": true
+    },
+    {
+      "repository": "m1n1",
+      "revision": "4184923ffb2dff079b384d6a32cc02142aa14572",
+      "path": "src/nvme.c",
+      "url": "https://raw.githubusercontent.com/AsahiLinux/m1n1/4184923ffb2dff079b384d6a32cc02142aa14572/src/nvme.c",
+      "sha256": "a99c813c9ce94873aaf02b8b4d92a1be07c80d1eaa631d3cdad9db43808d4d52",
+      "local_sha256": "a99c813c9ce94873aaf02b8b4d92a1be07c80d1eaa631d3cdad9db43808d4d52",
+      "identical": true
+    },
+    {
+      "repository": "m1n1",
+      "revision": "4184923ffb2dff079b384d6a32cc02142aa14572",
+      "path": "src/rtkit.c",
+      "url": "https://raw.githubusercontent.com/AsahiLinux/m1n1/4184923ffb2dff079b384d6a32cc02142aa14572/src/rtkit.c",
+      "sha256": "f0cfc194bd8996abdf404f4d5052d284c76f0ceb9613d77933226990703584f4",
+      "local_sha256": "f0cfc194bd8996abdf404f4d5052d284c76f0ceb9613d77933226990703584f4",
+      "identical": true
+    },
+    {
+      "repository": "m1n1",
+      "revision": "4184923ffb2dff079b384d6a32cc02142aa14572",
+      "path": "src/pcie.c",
+      "url": "https://raw.githubusercontent.com/AsahiLinux/m1n1/4184923ffb2dff079b384d6a32cc02142aa14572/src/pcie.c",
+      "sha256": "a0144a7f105fe760af6883b89e4db6283943c29109a7d8a43538d085624a3286",
+      "local_sha256": "a0144a7f105fe760af6883b89e4db6283943c29109a7d8a43538d085624a3286",
+      "identical": true
+    },
+    {
+      "repository": "m1n1",
+      "revision": "4184923ffb2dff079b384d6a32cc02142aa14572",
+      "path": "src/kboot_gpu.c",
+      "url": "https://raw.githubusercontent.com/AsahiLinux/m1n1/4184923ffb2dff079b384d6a32cc02142aa14572/src/kboot_gpu.c",
+      "sha256": "73143c1f8bbb9e1b3192aeb17bb607ba2052928ebe9499e93e5b57cf90ac6184",
+      "local_sha256": "73143c1f8bbb9e1b3192aeb17bb607ba2052928ebe9499e93e5b57cf90ac6184",
+      "identical": true
+    }
+  ],
+  "scope": "Comparison of specific files at observed official main/asahi-wip revisions; not a claim about every developer branch or unpublished work."
+}
