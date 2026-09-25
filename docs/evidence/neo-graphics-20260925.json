@@ -1,0 +1,46 @@
+{
+  "captured_at": "2026-09-25T02:46:51.228202+00:00",
+  "macos_version": "26.5.2",
+  "ioreg_sha256": "7b58fe4a92e7cc6552581c7f4c8f88eebff3dc5df04c61d2717689d3de939123",
+  "observed_driver_metadata": [
+    {
+      "property": "CFBundleIdentifier",
+      "value": "com.apple.AGXG17P"
+    },
+    {
+      "property": "IOClass",
+      "value": "AGXAcceleratorG17P"
+    },
+    {
+      "property": "IOObjectClass",
+      "value": "AGXAcceleratorG17P"
+    },
+    {
+      "property": "IOObjectClass",
+      "value": "AGXDeviceUserClient"
+    }
+  ],
+  "installed_bundles": [
+    {
+      "bundle_identifier": "com.apple.AGXG17P",
+      "info_sha256": "008c8afff8ac477b3b95ccd5ab43266bdda4adeb5521ae528e0173e163c7082f",
+      "CFBundleVersion": "351.2",
+      "CFBundleShortVersionString": "351.2"
+    },
+    {
+      "bundle_identifier": "com.apple.AGXFirmwareKextG17PRTBuddy",
+      "info_sha256": "011aa45fd64d31ba9e7ad94a1304b9baaf3592d648d618e1cfb3e011b1cd1766",
+      "CFBundleVersion": "1",
+      "CFBundleShortVersionString": "351.2"
+    }
+  ],
+  "local_source_sha256": {
+    "src/linux-asahi/drivers/gpu/drm/asahi/hw/mod.rs": "a95fceff7e41563a7aa0b2365c6e39488e2d4f828c0a20bc2b888b0cb4b1185f",
+    "src/linux-asahi/drivers/gpu/drm/asahi/driver.rs": "7a81fbdbd582edff0d30346576d98d842a18977489300ac395928aab8b589a36",
+    "src/m1n1/src/kboot_gpu.c": "73143c1f8bbb9e1b3192aeb17bb607ba2052928ebe9499e93e5b57cf90ac6184",
+    "src/dts/t8140.dtsi": "0a10ee6d3adc4cf7206d9e8e5df6c1ae2e50fbdd61e0c40dde25ae4af9041ecb",
+    "kernel/config/neo-native.config": "8e1581327a960c91deabe2bd34d8320098840ddcbb6a109d4e25094ca9ad3128"
+  },
+  "linux_acceleration_tested": false,
+  "scope": "Read-only registry and fixed Info.plist metadata. No firmware copied, user client opened, graphics command submitted or native GPU state changed."
+}
