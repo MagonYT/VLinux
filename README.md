@@ -42,6 +42,7 @@ kernel, reboot a machine, or issue native SSD-controller commands.
 - [Architecture](docs/ARCHITECTURE.md)
 - [Hardware support](docs/HARDWARE.md)
 - [SSD bring-up](docs/SSD.md)
+- [Desktop diagnostics batch](docs/DIAGNOSTICS.md)
 - [Wi-Fi and Bluetooth identity and porting path](docs/NETWORK.md)
 - [Touch ID investigation and read-only scanner](docs/TOUCH-ID.md)
 - [Development and validation](docs/DEVELOPMENT.md)

@@ -1,0 +1,70 @@
+{
+  "prepared_at": "2026-09-25T02:40:20.502867+00:00",
+  "build_id": "7772e6cf0aa14b71",
+  "payload_sha256": "3515e3509efb5a3bd83c6785a4d5b8432415134dd25d8ff86a2ef19c1fb306e0",
+  "payload_bytes": 457670656,
+  "asset_sha256": {
+    "scripts/test-center-diagnostics/Main.qml": "9cd41c004ecc64ab601fd02941e6f9670a1a86872504fc54eb6e2f9d7a57fd18",
+    "scripts/test-center-diagnostics/collect.sh": "5817f222cf1c45eb36e99f4b35f33e9f5748ccdd77bfa5bb25dd0cf0ced81c49",
+    "scripts/test-center-diagnostics/open.sh": "2e16ef430ddf91aa0005e26386d564f95daedb47734d49d831038c26b02e39dc"
+  },
+  "private_host_regressions": 195,
+  "vm": {
+    "platform": "QEMU virt",
+    "cpus": 1,
+    "memory_gib": 4,
+    "disk": false,
+    "nic": false,
+    "vm_only_display_change": "Xorg modesetting with acceleration disabled; native payload stays fbdev",
+    "checks": {
+      "systemd": {
+        "passed": true,
+        "clean_exit": true
+      },
+      "plasma": {
+        "passed": true,
+        "clean_exit": true
+      },
+      "desktop": {
+        "passed": true,
+        "clean_exit": true
+      }
+    }
+  },
+  "report_pages": [
+    {
+      "page": "hardware",
+      "passed": true,
+      "sha256": "0ff5871fad1a91535386da459284d9243bc11bd2afcdb3e19586f25939ab80cd"
+    },
+    {
+      "page": "ssd",
+      "passed": true,
+      "sha256": "975b89b08a71f57e1f42b75f3ca125da4a726609dfd3784572af2517430208e2"
+    },
+    {
+      "page": "network",
+      "passed": true,
+      "sha256": "83035ca7569aba8ae2c3d21e612f14208341ba37793e3c1e38c937dde82032cb"
+    },
+    {
+      "page": "input",
+      "passed": true,
+      "sha256": "b383d96aa47fda71c8914eafdc29bf970f2ed2a4b58e5a35e0f50d0f50c8d542"
+    },
+    {
+      "page": "logs",
+      "passed": true,
+      "sha256": "42b434b572e12bdacee25de5a27bd6e9ba84655ee39ce1d088d930257a4aa188"
+    },
+    {
+      "page": "details",
+      "passed": true,
+      "sha256": "a098e0a57c81e31382557647a3d1bd334fdb28e2a8c5651cd75274fda2c68058"
+    }
+  ],
+  "report_controls_rendered": true,
+  "report_controls_exercised": false,
+  "native_tested": false,
+  "scope": "UI and report preparation only. No m1n1 execution, native DT, SSD access or physical input tested in these VM runs."
+}
